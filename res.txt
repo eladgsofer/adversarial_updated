@@ -1,0 +1,13 @@
+
+mode clean_model epsilon 0.006 ISTA adversarial loss: 0.04720705633977884 clean loss 0.016681931611920178
+mode clean_model epsilon 0.006 ISTA adversarial loss: 0.04847885660005838 clean loss 0.0167143905591213
+mode robust_model epsilon 0.006 ISTA adversarial loss: 0.040557846117913826 clean loss 0.013010486540351814
+mode robust_model epsilon 0.006 ISTA adversarial loss: 0.040559711915800545 clean loss 0.013551396083119836
+mode clean_model epsilon 0.025 ISTA adversarial loss: 0.2800063196638741 clean loss 0.01657091586859361
+mode clean_model epsilon 0.025 ISTA adversarial loss: 0.2856988248653003 clean loss 0.016675324355888522
+mode robust_model epsilon 0.025 ISTA adversarial loss: 0.20126352740337533 clean loss 0.014344463183113172
+mode robust_model epsilon 0.025 ISTA adversarial loss: 0.20506368292017277 clean loss 0.015548004488162744
+mode clean_model epsilon 0.044 ISTA adversarial loss: 0.7177485965104513 clean loss 0.016717785207388952
+mode clean_model epsilon 0.044 ISTA adversarial loss: 0.7392899655287725 clean loss 0.016663451553210824
+mode robust_model epsilon 0.044 ISTA adversarial loss: 0.3730569149954591 clean loss 0.02737170648929873
+mode robust_model epsilon 0.044 ISTA adversarial loss: 0.37401583238576025 clean loss 0.027757115273115265

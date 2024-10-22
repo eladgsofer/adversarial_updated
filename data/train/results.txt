@@ -1,0 +1,91 @@
+/Users/elad.sofer/opt/anaconda3/bin/python3 /Users/elad.sofer/src/ADVERSARIAL_SENSITIVTY/lista.py
+Using device cpu
+##### Adversarial epsilon -1 #####
+Epoch 0, Train loss 0.85250585, Validation loss 0.72670893
+Epoch 5, Train loss 0.06844683, Validation loss 0.06699519
+Epoch 10, Train loss 0.02595145, Validation loss 0.02726206
+Epoch 15, Train loss 0.01805515, Validation loss 0.02006600
+Epoch 20, Train loss 0.01531106, Validation loss 0.01753142
+Epoch 25, Train loss 0.01300045, Validation loss 0.01544756
+##### Adversarial epsilon 0.0015 #####
+Epoch 0, Train loss 0.85217184, Validation loss 0.71948961
+Epoch 5, Train loss 0.06911577, Validation loss 0.06776536
+Epoch 10, Train loss 0.02625376, Validation loss 0.02742267
+Epoch 15, Train loss 0.01807414, Validation loss 0.02010884
+Adversarial batch 1 was added
+Epoch 20, Train loss 0.03039100, Validation loss 0.01739723
+Epoch 25, Train loss 0.06927891, Validation loss 0.01445801
+##### Adversarial epsilon 0.0016 #####
+Epoch 0, Train loss 0.82133663, Validation loss 0.53357169
+Epoch 5, Train loss 0.13268046, Validation loss 0.06625202
+Adversarial batch 1 was added
+Epoch 10, Train loss 0.11767944, Validation loss 0.04222706
+Epoch 15, Train loss 0.13014474, Validation loss 0.02136275
+Epoch 20, Train loss 0.11239813, Validation loss 0.01634571
+Adversarial batch 2 was added
+Adversarial batch 3 was added
+Epoch 25, Train loss 0.14054749, Validation loss 0.01838321
+##### Adversarial epsilon 0.0017 #####
+Epoch 0, Train loss 0.67621228, Validation loss 0.11574810
+Adversarial batch 1 was added
+Epoch 5, Train loss 0.29483702, Validation loss 0.03786303
+Adversarial batch 2 was added
+Epoch 10, Train loss 0.22490216, Validation loss 0.03809877
+Epoch 15, Train loss 0.21351483, Validation loss 0.05006314
+Adversarial batch 3 was added
+Epoch 20, Train loss 0.19204763, Validation loss 0.05412145
+Epoch 25, Train loss 0.18954868, Validation loss 0.06076829
+##### Adversarial epsilon 0.0018 #####
+Epoch 0, Train loss 0.73867521, Validation loss 0.23383183
+Adversarial batch 1 was added
+Epoch 5, Train loss 0.35699413, Validation loss 0.06343025
+Adversarial batch 2 was added
+Epoch 10, Train loss 0.28867090, Validation loss 0.09002544
+Adversarial batch 3 was added
+Adversarial batch 4 was added
+Adversarial batch 5 was added
+Adversarial batch 6 was added
+Adversarial batch 7 was added
+Adversarial batch 8 was added
+Epoch 15, Train loss 0.30032003, Validation loss 0.08080646
+Epoch 20, Train loss 0.29202992, Validation loss 0.10896842
+Adversarial batch 9 was added
+Epoch 25, Train loss 0.24276418, Validation loss 0.13701736
+Adversarial batch 10 was added
+####################### adversarial mode: -1 ########################
+vanilla_clean_loss 0.010987313666150704
+robust_clean_loss 0.014028188151148464
+ISTA_clean_loss_0.5122965086926865
+vanilla_adv_loss 0.008084366719302535
+robust_adv_loss 0.011219846457726173
+ISTA_clean_loss_0.5063124371320642
+####################### adversarial mode: 0.0015 ########################
+vanilla_clean_loss 0.010987313666150706
+robust_clean_loss 0.011485461566694546
+ISTA_clean_loss_0.5122965086926865
+vanilla_adv_loss 0.10209226471175331
+robust_adv_loss 0.0765225264120379
+ISTA_clean_loss_0.5643141704794525
+####################### adversarial mode: 0.0016 ########################
+vanilla_clean_loss 0.010987313666150704
+robust_clean_loss 0.021294176853262913
+ISTA_clean_loss_0.5122965086926865
+vanilla_adv_loss 0.34151729008339987
+robust_adv_loss 0.17588724126161417
+ISTA_clean_loss_0.6178535262101299
+####################### adversarial mode: 0.0017 ########################
+vanilla_clean_loss 0.010987313666150704
+robust_clean_loss 0.0794493703225278
+ISTA_clean_loss_0.5122965086926865
+vanilla_adv_loss 0.6392430964249344
+robust_adv_loss 0.17773858125289607
+ISTA_clean_loss_0.7275680610098932
+####################### adversarial mode: 0.0018 ########################
+vanilla_clean_loss 0.010987313666150706
+robust_clean_loss 0.20312267249633134
+ISTA_clean_loss_0.5122965086926865
+vanilla_adv_loss 0.9357000553602043
+robust_adv_loss 0.20592184391866683
+ISTA_clean_loss_0.7706680225628033
+
+Process finished with exit code 0

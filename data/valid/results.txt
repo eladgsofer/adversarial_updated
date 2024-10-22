@@ -1,0 +1,188 @@
+##### Adversarial epsilon -1 #####
+Epoch 0, Train loss 0.48951126, Validation loss 0.10918969
+Epoch 5, Train loss 0.01845382, Validation loss 0.01797513
+Epoch 10, Train loss 0.01187195, Validation loss 0.01188921
+Epoch 15, Train loss 0.00765085, Validation loss 0.00792931
+Epoch 20, Train loss 0.00523956, Validation loss 0.00563061
+Epoch 25, Train loss 0.00401473, Validation loss 0.00446594
+Epoch 30, Train loss 0.00343548, Validation loss 0.00393709
+Epoch 35, Train loss 0.00311828, Validation loss 0.00367774
+##### Adversarial epsilon 0.0014 #####
+Epoch 0, Train loss 0.51131934, Validation loss 0.11761261
+Adversarial batch 1 was added
+Epoch 5, Train loss 0.02617208, Validation loss 0.01770848
+Epoch 10, Train loss 0.03035489, Validation loss 0.01083971
+Adversarial batch 2 was added
+Epoch 15, Train loss 0.04592314, Validation loss 0.00721771
+Epoch 20, Train loss 0.05776092, Validation loss 0.00640452
+Epoch 25, Train loss 0.05990147, Validation loss 0.00785672
+Epoch 30, Train loss 0.05631712, Validation loss 0.01189711
+Epoch 35, Train loss 0.05102767, Validation loss 0.01472237
+Adversarial batch 3 was added
+##### Adversarial epsilon 0.0015 #####
+Epoch 0, Train loss 0.41567006, Validation loss 0.08788019
+Adversarial batch 1 was added
+Epoch 5, Train loss 0.11974486, Validation loss 0.02953983
+Adversarial batch 2 was added
+Adversarial batch 3 was added
+Adversarial batch 4 was added
+Epoch 10, Train loss 0.11805813, Validation loss 0.02147169
+Epoch 15, Train loss 0.13178303, Validation loss 0.02478166
+Adversarial batch 5 was added
+Epoch 20, Train loss 0.13841695, Validation loss 0.03563739
+Epoch 25, Train loss 0.12581112, Validation loss 0.05207662
+Adversarial batch 6 was added
+Adversarial batch 7 was added
+Epoch 30, Train loss 0.11908799, Validation loss 0.05964058
+Epoch 35, Train loss 0.11606576, Validation loss 0.06445059
+Adversarial batch 8 was added
+##### Adversarial epsilon 0.0016 #####
+Adversarial batch 1 was added
+Epoch 0, Train loss 0.49028553, Validation loss 0.08391665
+Adversarial batch 2 was added
+Adversarial batch 3 was added
+Epoch 5, Train loss 0.27341732, Validation loss 0.06907552
+Adversarial batch 4 was added
+Adversarial batch 5 was added
+Adversarial batch 6 was added
+Epoch 10, Train loss 0.23349864, Validation loss 0.08533693
+Adversarial batch 7 was added
+Adversarial batch 8 was added
+Epoch 15, Train loss 0.23023551, Validation loss 0.10223297
+Adversarial batch 9 was added
+Adversarial batch 10 was added
+Adversarial batch 11 was added
+Epoch 20, Train loss 0.22208185, Validation loss 0.13155992
+Adversarial batch 12 was added
+Adversarial batch 13 was added
+Adversarial batch 14 was added
+Adversarial batch 15 was added
+Adversarial batch 16 was added
+Adversarial batch 17 was added
+Epoch 25, Train loss 0.22748003, Validation loss 0.14898440
+Adversarial batch 18 was added
+Adversarial batch 19 was added
+Adversarial batch 20 was added
+Adversarial batch 21 was added
+Adversarial batch 22 was added
+Epoch 30, Train loss 0.23800838, Validation loss 0.16550256
+Adversarial batch 23 was added
+Epoch 35, Train loss 0.23384904, Validation loss 0.21080612
+Adversarial batch 24 was added
+Adversarial batch 25 was added
+Adversarial batch 26 was added
+Adversarial batch 27 was added
+Adversarial batch 28 was added
+Adversarial batch 29 was added
+##### Adversarial epsilon 0.0017 #####
+Epoch 0, Train loss 0.60810462, Validation loss 0.16025553
+Adversarial batch 1 was added
+Adversarial batch 2 was added
+Epoch 5, Train loss 0.42092299, Validation loss 0.19398370
+Adversarial batch 3 was added
+Adversarial batch 4 was added
+Adversarial batch 5 was added
+Adversarial batch 6 was added
+Adversarial batch 7 was added
+Adversarial batch 8 was added
+Adversarial batch 9 was added
+Epoch 10, Train loss 0.36566784, Validation loss 0.22928063
+Adversarial batch 10 was added
+Adversarial batch 11 was added
+Adversarial batch 12 was added
+Adversarial batch 13 was added
+Epoch 15, Train loss 0.34537822, Validation loss 0.24295436
+Adversarial batch 14 was added
+Adversarial batch 15 was added
+Epoch 20, Train loss 0.32261411, Validation loss 0.25090516
+Adversarial batch 16 was added
+Adversarial batch 17 was added
+Adversarial batch 18 was added
+Adversarial batch 19 was added
+Adversarial batch 20 was added
+Adversarial batch 21 was added
+Adversarial batch 22 was added
+Adversarial batch 23 was added
+Adversarial batch 24 was added
+Adversarial batch 25 was added
+Adversarial batch 26 was added
+Adversarial batch 27 was added
+Epoch 25, Train loss 0.31335449, Validation loss 0.28436992
+Adversarial batch 28 was added
+Adversarial batch 29 was added
+Adversarial batch 30 was added
+Adversarial batch 31 was added
+Adversarial batch 32 was added
+Adversarial batch 33 was added
+Adversarial batch 34 was added
+Adversarial batch 35 was added
+Adversarial batch 36 was added
+Adversarial batch 37 was added
+Adversarial batch 38 was added
+Adversarial batch 39 was added
+Adversarial batch 40 was added
+Adversarial batch 41 was added
+Adversarial batch 42 was added
+Adversarial batch 43 was added
+Epoch 30, Train loss 0.32024092, Validation loss 0.30818117
+Adversarial batch 44 was added
+Adversarial batch 45 was added
+Adversarial batch 46 was added
+Adversarial batch 47 was added
+Adversarial batch 48 was added
+Adversarial batch 49 was added
+Adversarial batch 50 was added
+Adversarial batch 51 was added
+Adversarial batch 52 was added
+Adversarial batch 53 was added
+Adversarial batch 54 was added
+Adversarial batch 55 was added
+Adversarial batch 56 was added
+Adversarial batch 57 was added
+Adversarial batch 58 was added
+Adversarial batch 59 was added
+Epoch 35, Train loss 0.31893598, Validation loss 0.36008421
+Adversarial batch 60 was added
+Adversarial batch 61 was added
+Adversarial batch 62 was added
+Adversarial batch 63 was added
+Adversarial batch 64 was added
+Adversarial batch 65 was added
+Adversarial batch 66 was added
+Adversarial batch 67 was added
+Adversarial batch 68 was added
+####################### adversarial mode: -1 ########################
+vanilla_clean_loss 0.003491886316697503
+robust_clean_loss 0.003491886316697503
+ISTA_clean_loss_0.5163169249503008
+vanilla_adv_loss 0.0034918863166975025
+robust_adv_loss 0.0034918863166975025
+ISTA_adv_loss_0.5163169249503008
+####################### adversarial mode: 0.0014 ########################
+vanilla_clean_loss 0.0034918863166975025
+robust_clean_loss 0.01817990418409049
+ISTA_clean_loss_0.5163169249503008
+vanilla_adv_loss 0.2987105024250463
+robust_adv_loss 0.47745157445265957
+ISTA_adv_loss_0.5044290165993695
+####################### adversarial mode: 0.0015 ########################
+vanilla_clean_loss 0.0034918863166975025
+robust_clean_loss 0.0894678240283615
+ISTA_clean_loss_0.5163169249503008
+vanilla_adv_loss 0.20683360586058536
+robust_adv_loss 1.0307008981896857
+ISTA_adv_loss_0.4963072638258903
+####################### adversarial mode: 0.0016 ########################
+vanilla_clean_loss 0.003491886316697503
+robust_clean_loss 0.21726875382524674
+ISTA_clean_loss_0.5163169249503008
+vanilla_adv_loss 0.1645278701663043
+robust_adv_loss 1.232559687474267
+ISTA_adv_loss_0.4655539900873054
+####################### adversarial mode: 0.0017 ########################
+vanilla_clean_loss 0.003491886316697503
+robust_clean_loss 0.3828760923242458
+ISTA_clean_loss_0.5163169249503008
+vanilla_adv_loss 0.12414254312858342
+robust_adv_loss 1.3907753008733896
+ISTA_adv_loss_0.5074038953109464
