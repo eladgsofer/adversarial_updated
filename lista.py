@@ -267,8 +267,7 @@ def lista_apply(train_loader, test_loader, T, H):
     train(lista, train_loader, test_loader, save_models=True)
     # validate(lista)
 
-
-if __name__ == '__main__':
+def start():
     from ista import ISTA
 
     # number of unfolded iteartions
@@ -281,6 +280,9 @@ if __name__ == '__main__':
     # ista_apply(test_loader, )
     lista_mse_vs_iter = lista_apply(train_loader, test_loader, T_LISTA, H)
     pass
+
+if __name__ == '__main__':
+    start()
 
     # Get these values from ISTA
     # (train_loader.dataset[0][0].float().unsqueeze(0), train_loader.dataset[0][1].float().unsqueeze(0))
