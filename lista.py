@@ -7,7 +7,7 @@ import numpy as np
 import random
 from utills import epoch, epoch_adversarial
 
-from ista import BIM
+from ista import BIM, ISTA
 import copy
 
 from data import SimulatedData
@@ -268,13 +268,12 @@ def lista_apply(train_loader, test_loader, T, H):
     # validate(lista)
 
 def start():
-    from ista import ISTA
+
 
     # number of unfolded iteartions
 
     T_LISTA = LISTA_Model.T_LISTA = 20
     # T_ISTA = 20 * T_LISTA
-
     # TODO play with the batch_size to reduce/increase adversarial examples. determine 1000=dataset.
     # Train and apply LISTA with T iterations / layers
     # ista_apply(test_loader, )
