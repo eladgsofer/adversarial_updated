@@ -160,7 +160,7 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
         for i in range(sig_amount):
             signals.append(generate_signal())
 
-    if H_mat is not None:
+    if H_mat is None:
         H_mat = H
 
     ##########################################################

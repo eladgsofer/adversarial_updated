@@ -1,6 +1,5 @@
 __author__ = 'Elad Sofer <elad.g.sofer@gmail.com>'
 
-
 import copy
 
 import torch.nn as nn
@@ -63,7 +62,7 @@ class ADMM(nn.Module, LandscapeWrapper):
         # ρ parameter
         self.rho = rho
         # λ parameter
-        self.lambda_ = lambda_ 
+        self.lambda_ = lambda_
 
         # Objective parameters
         self.H = H
@@ -95,12 +94,16 @@ class ADMM(nn.Module, LandscapeWrapper):
         torch.Tensor: Reconstructed sparse signal.
         list: List of recovery errors at each iteration.
         """
+        batch_size = 1 if 1 in x.shape else x.shape[0]
+        if batch_size != 1:
+            x = x.T
+
         recovery_errors = []
         for k in range(self.max_iter):
             s_prev, v_prev, u_prev = self.s, self.v, self.u
 
             # Update s_k+1 = ((H^T)H+2λI)^−1(H^T x+2λ(vk−uk)).
-            right_term = torch.matmul(H.T, x) + self.rho * (v_prev - u_prev)
+            right_term = torch.matmul(self.H.T, x) + self.rho * (v_prev - u_prev)
             self.s = self.left_term @ right_term
 
             # Update vk+1 = prox_(1/2λϕ)(sk+1 + uk)
@@ -110,7 +113,8 @@ class ADMM(nn.Module, LandscapeWrapper):
             self.u = u_prev + self.mu * (self.s - self.v)
 
             # cease if convergence achieved
-            if torch.sum(torch.abs(self.s - s_prev)) <= self.eps:  break
+            if torch.sum(torch.abs(self.s - s_prev)).item() / batch_size <= self.eps:
+                break
 
             # save recovery error
             recovery_errors.append(torch.sum((torch.matmul(self.H, self.s) - x) ** 2).item())
@@ -161,7 +165,7 @@ class ADMM(nn.Module, LandscapeWrapper):
         return cls(H, step_size, lambda_, max_iter, eps_threshold, rho)
 
 
-def execute():
+def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=False):
     """
     Perform a series of operations on generated signals:
     1. Generate 'c' (set to 100) signals of the form x_i = Hs + w, where w follows a Gaussian distribution.
@@ -171,7 +175,13 @@ def execute():
     5. Aggregate the L2 norm ||s^* - s^*_{adv}|| for each signal and epsilon value.
     6. Plot the loss surfaces in various forms (3D, 2D, 1D) and other related graphs.
     """
-    signals = []
+    if H_mat is None:
+        H_mat = H
+
+    if not signals:
+        # Generate signals
+        for i in range(sig_amount):
+            signals.append(generate_signal())
 
     # ISTA_min_distances = np.load('stack/version1/matrices/ISTA_total_norm.npy')
     # ADMM_min_distances = np.load('stack/version1/matrices/ADMM_total_norm.npy')
@@ -179,23 +189,20 @@ def execute():
     dist_total = np.zeros((sig_amount, r_step))
     radius_vec = np.linspace(eps_min, eps_max, r_step)
 
-    # Generate signals
-    for i in range(sig_amount):
-        signals.append(generate_signal())
+
 
     ##########################################################
 
     for sig_idx, (x_original, s_original) in enumerate(signals):
         # ADMM without an attack reconstruction
-        ADMM_t_model = ADMM.create_ADMM()
+        ADMM_t_model = ADMM.create_ADMM(H=H_mat)
         s_gt, err_gt = ADMM_t_model(x_original.detach())
         print("#### ADMM signal {0} convergence: iterations: {1} ####".format(sig_idx, len(err_gt)))
         s_gt = s_gt.detach()
 
-        for e_idx, attack_eps in enumerate(radius_vec):
+        for e_idx, attack_eps in enumerate([0.025]):
             # print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(r))
-
-            ADMM_adv_model = ADMM.create_ADMM()
+            ADMM_adv_model = ADMM.create_ADMM(H=H_mat)
 
             adv_x, delta = BIM(ADMM_adv_model, x_original, s_original, eps=attack_eps)
             adv_x = adv_x.detach()
@@ -208,17 +215,20 @@ def execute():
     # np.save('data/stack/version1/matrices/ADMM_total_norm.npy', dist_total)
 
     ##########################################################
-    plot_norm_graph(radius_vec, dist_total.mean(axis=0), fname="NORM2_ADMM.pdf")
+    if plot_graphs:
+        plot_norm_graph(radius_vec, dist_total.mean(axis=0), fname="NORM2_ADMM.pdf")
 
     # Presenting last iteration signal loss graphs for r=max_eps
     x = x_original.detach()
 
-    plot_conv_rec_graph(s_attacked.detach().numpy(), s_gt.detach().numpy(), s_original,
-                        err_attacked, err_gt,
-                        fname='convergence_ADMM.pdf')
+    if plot_graphs:
+        plot_conv_rec_graph(s_attacked.detach().numpy(), s_gt.detach().numpy(), s_original,
+                            err_attacked, err_gt,
+                            fname='convergence_ADMM.pdf')
 
-    # plot observations
-    plot_observations(adv_x, x, fname="ADMM_observation.pdf")
+    if plot_graphs:
+        # plot observations
+        plot_observations(adv_x, x, fname="ADMM_observation.pdf")
 
     dir_one, dir_two = ADMM_t_model.get_grid_vectors(ADMM_t_model, ADMM_adv_model)
 
@@ -227,9 +237,14 @@ def execute():
                                                 deepcopy_model=True)
     adv_line = ADMM_t_model.linear_interpolation(model_start=ADMM_t_model, model_end=ADMM_adv_model, x_sig=adv_x,
                                                  deepcopy_model=True)
+    if plot_graphs:
+        plot_1d_surface(gt_line, adv_line, 'ADMM_1D_LOSS.pdf')
 
-    plot_1d_surface(gt_line, adv_line, 'ADMM_1D_LOSS.pdf')
-
+    if get_exec_params_mode:
+        kwargs = dict(gt_model=ADMM_t_model, adv_model=ADMM_adv_model,
+                      adv_x=adv_x, x=x, dir_one=dir_one, dir_two=dir_two,
+                      steps=loss3d_res_steps)
+        return kwargs
     # Plotting 2D & 3D
     Z_gt, Z_adv = ADMM_t_model.random_plane(gt_model=ADMM_t_model, adv_model=ADMM_adv_model,
                                             adv_x=adv_x, x=x, dir_one=dir_one, dir_two=dir_two, steps=loss3d_res_steps)

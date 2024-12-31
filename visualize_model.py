@@ -105,7 +105,7 @@ class LandscapeWrapper(ABC):
         return np.array(data_values)
 
     def random_plane(self, gt_model, adv_model, x, adv_x, distance=3, steps=400,
-                     deepcopy_model=False, dir_one=None, dir_two=None, LISTA_clean_trajectory=None, LISTA_adv_trajectory=None) -> np.ndarray:
+                     deepcopy_model=False, dir_one=None, dir_two=None, clean_trajectory=None, adv_trajectory=None) -> np.ndarray:
         """
         Computes and returns the evaluated value of the evaluation function applied to the model or agent along a planar
         subspace of the parameter space. The subspace is defined by two vectors: dir_one and dir_two.
@@ -156,11 +156,11 @@ class LandscapeWrapper(ABC):
         gt_data_matrix = []
         adv_data_matrix = []
 
-        if LISTA_adv_trajectory:
-            lista_adv_matrix = [{'dist': float('inf'), 'i': 0, 'j': 0, 'loss': 0} for i in range(len(LISTA_adv_trajectory))]
+        if adv_trajectory:
+            adv_matrix = [{'dist': float('inf'), 'i': 0, 'j': 0, 'loss': 0} for i in range(len(adv_trajectory))]
 
-        if LISTA_clean_trajectory:
-            lista_clean_matrix = [{'dist': float('inf'), 'i': 0, 'j': 0, 'loss': 0} for i in range(len(LISTA_clean_trajectory))]
+        if clean_trajectory:
+            clean_matrix = [{'dist': float('inf'), 'i': 0, 'j': 0, 'loss': 0} for i in range(len(clean_trajectory))]
 
 
         # evaluate loss in grid of (steps * steps) points, where each column signifies one step
@@ -190,32 +190,32 @@ class LandscapeWrapper(ABC):
                     gt_data_column.insert(0, gt_model.loss_func(s, x))
                     adv_data_column.insert(0, adv_model.loss_func(s, adv_x))
 
-                if LISTA_adv_trajectory:
-                    for idx in range(len(LISTA_adv_trajectory)):
-                        s_adv_step = LISTA_adv_trajectory[idx]
+                if adv_trajectory:
+                    for idx in range(len(adv_trajectory)):
+                        s_adv_step = adv_trajectory[idx]
                         dist = (s_adv_step.T-s).norm(2).item()
-                        if dist < lista_adv_matrix[idx]['dist']:
-                            lista_adv_matrix[idx]['i'] = i
-                            lista_adv_matrix[idx]['j'] = j
-                            lista_adv_matrix[idx]['dist'] = dist
-                            lista_adv_matrix[idx]['loss'] = gt_model.loss_func(s_adv_step.T, x)
+                        if dist < adv_matrix[idx]['dist']:
+                            adv_matrix[idx]['i'] = i
+                            adv_matrix[idx]['j'] = j
+                            adv_matrix[idx]['dist'] = dist
+                            adv_matrix[idx]['loss'] = gt_model.loss_func(s_adv_step.T, x)
 
-                if LISTA_clean_trajectory:
-                    for idx in range(len(LISTA_clean_trajectory)):
-                        s_clean_step = LISTA_clean_trajectory[idx]
+                if clean_trajectory:
+                    for idx in range(len(clean_trajectory)):
+                        s_clean_step = clean_trajectory[idx]
                         dist = (s_clean_step.T-s).norm(2).item()
-                        if dist < lista_clean_matrix[idx]['dist']:
-                            lista_clean_matrix[idx]['i'] = i
-                            lista_clean_matrix[idx]['j'] = j
-                            lista_clean_matrix[idx]['dist'] = dist
-                            lista_clean_matrix[idx]['loss'] = gt_model.loss_func(s_clean_step.T, x)
+                        if dist < clean_matrix[idx]['dist']:
+                            clean_matrix[idx]['i'] = i
+                            clean_matrix[idx]['j'] = j
+                            clean_matrix[idx]['dist'] = dist
+                            clean_matrix[idx]['loss'] = gt_model.loss_func(s_clean_step.T, x)
 
             gt_data_matrix.append(gt_data_column)
             adv_data_matrix.append(adv_data_column)
 
             avg_start_point.add_(dir_one)
 
-        if LISTA_clean_trajectory and LISTA_adv_trajectory:
-            return np.array(gt_data_matrix), np.array(adv_data_matrix), lista_clean_matrix,  lista_adv_matrix
+        if clean_trajectory and adv_trajectory:
+            return np.array(gt_data_matrix), np.array(adv_data_matrix), clean_matrix,  adv_matrix
 
         return np.array(gt_data_matrix), np.array(adv_data_matrix)

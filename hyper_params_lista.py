@@ -7,7 +7,7 @@ import numpy as np
 import random
 from utills import epoch, epoch_adversarial
 
-from ista import BIM
+from ista import BIM, ISTA
 import copy
 
 from data import SimulatedData
@@ -21,41 +21,6 @@ random.seed(SEED)
 torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 
-
-def create_data_set(H, n, m, k, N=1000, batch_size=BATCH_SIZE, signal_dev=0.5, noise_dev=0.01):
-    # Initialization
-    x = torch.zeros(N, n)
-    s = torch.zeros(N, m)
-    #
-    # s = np.zeros((1, m))
-    # index_k = np.random.choice(m, k, replace=False)
-    # s[:, index_k] = 0.5 * np.random.randn(k, 1).reshape([1, k])
-    # s = torch.from_numpy(s).float()
-    #
-    # # x = Hs+w s.t w~N(0,1)
-    # x = np.dot(H, s.T) + 0.01 * np.random.randn(n, 1)
-    # x = torch.from_numpy(x).float()
-    # return x.detach(), s.detach()
-
-    # Create signals
-    for i in range(N):
-        # Create a k-sparsed signal s
-        # x_sig, s_sig = generate_signal()
-        # x[i, :], s[i, :] = x_sig.squeeze(1), s_sig.squeeze(0)
-        index_k = np.random.choice(m, k, replace=False)
-        peaks = 0.5 * np.random.randn(k, 1).reshape([1, k])
-
-        s[i, index_k] = torch.from_numpy(peaks).to(s)
-
-        # X = Hs+w
-        # x[i, :] = H @ s[i, :] + noise_dev * torch.randn(n)
-        x[i, :] = H @ s[i, :] + 0.01 * torch.randn(n)
-
-    simulated = SimulatedData(x=x, H=H, s=s)
-    data_loader = Data.DataLoader(dataset=simulated, batch_size=batch_size, shuffle=True)
-    return data_loader
-
-
 N = 1200  # number of samples
 
 # n = 150  # dim(x)
@@ -68,36 +33,72 @@ m, n, k = 1500, 256, 5
 # Measurement matrix
 H = torch.randn(n, m)
 H /= torch.norm(H, dim=0)
+def_num_epochs = 40
+def_attack_max_radius = 0.1
+
+
+def create_data_set(H, n, m, k, N, batch_size=BATCH_SIZE, signal_dev=0.5, noise_dev=0.01):
+    # Initialization
+    x = torch.zeros(N, n)
+    s = torch.zeros(N, m)
+
+    # Create signals
+    for i in range(N):
+        # Create a k-sparsed signal s
+        # x_sig, s_sig = generate_signal()
+        # x[i, :], s[i, :] = x_sig.squeeze(1), s_sig.squeeze(0)
+        index_k = np.random.choice(m, k, replace=False)
+        peaks = signal_dev * np.random.randn(k, 1).reshape([1, k])
+
+        s[i, index_k] = torch.from_numpy(peaks).to(s)
+
+        # X = Hs+w
+        # x[i, :] = H @ s[i, :] + noise_dev * torch.randn(n)
+        x[i, :] = H @ s[i, :] + noise_dev * torch.randn(n)
+
+    simulated = SimulatedData(x=x, H=H, s=s)
+    data_loader = Data.DataLoader(dataset=simulated, batch_size=batch_size, shuffle=True)
+    return data_loader
+
 
 import ista
 
 ista.m = m
 ista.N = N
 ista.H = H
+
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
 test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
 
 
-def train(original_model, train_loader, valid_loader, num_epochs=10, attack_max_radius=0.1, save_models=False):
+def train(original_model, train_loader, valid_loader, num_epochs=def_num_epochs,
+          attack_max_radius=def_attack_max_radius, save_models=False):
     """Train a network.
     Returns:
         loss_test {numpy} -- loss function values on test set
     """
 
-    final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
-    final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
+    final_results_adv = {'clean_model': {'solver': [], 'all': []}, 'robust_model': {'solver': [], 'all': []}}
+    final_results_clean = {'clean_model': {'solver': [], 'all': []}, 'robust_model': {'solver': [], 'all': []}}
 
-    #adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
+    # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     adv_epsilon_vec = [0.006, 0.025, 0.038, 0.055, 0.069, attack_max_radius]
 
     for eps in adv_epsilon_vec:
         # Accumulate history for MSE vs epoch graph
         clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
-        for mode in ['ista', 'clean_model', 'robust_model']:
-            # # Initialization
-            if mode in ['clean_model', 'robust_model']:
+        for mode in ['clean_model', 'robust_model']:
+            for params_mode in ['solver', 'all']:
+                # Initialization
                 model = copy.deepcopy(original_model)
+                if params_mode == 'solver':
+                    model.A.requires_grad = False
+                    model.B.requires_grad = False
+                else:
+                    model.A.requires_grad = True
+                    model.B.requires_grad = True
+
                 optimizer = torch.optim.SGD(model.parameters(), lr=5e-05, momentum=0.9, weight_decay=0)
                 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
 
@@ -121,46 +122,31 @@ def train(original_model, train_loader, valid_loader, num_epochs=10, attack_max_
                         clean_model_clean.append(clean_loss)
 
                     print(*("{:.6f}".format(i) for i in (train_loss, clean_loss, adv_loss)), sep="\t")
-            else:
 
-                ista_model = ISTA.create_ISTA(H=H, max_iter=1000)
-                adv_loss, clean_loss = 0., 0.
-                for X, y in valid_loader:
-                    yp, _ = ista_model(X)
-                    clean_loss += F.mse_loss(yp.T, y, reduction="sum").item()
-                clean_loss /= len(valid_loader.dataset)
+                #TODO check this devision error and inverse it.
 
-                for X, y in valid_loader:
-                    adv_x, _ = BIM(ista_model, X, y, eps=eps)
-                    yp_adv, _ = ista_model(adv_x)
-                    adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
+                # adv_loss /= len(valid_loader.dataset)
+                # Accumulate results for MSE vs epsilon graph
+                final_results_adv[mode][params_mode].append(adv_loss)
+                final_results_clean[mode][params_mode].append(clean_loss)
 
-                adv_loss /= len(valid_loader.dataset)
-            # Accumulate results for MSE vs epsilon graph
-            final_results_adv[mode].append(adv_loss)
-            final_results_clean[mode].append(clean_loss)
+                if save_models and mode != 'ista':
+                    torch.save(model.state_dict(), '{0}_{1}_epochs_{2}.npy'.format(mode, eps, num_epochs))
 
-            if mode == 'robust_model':
-                robust_model = copy.deepcopy(model)
-            elif mode == 'clean_model':
-                clean_model = copy.deepcopy(model)
+                print("mode {0}_{1} epsilon {2} ISTA adversarial loss: {3} clean loss {4}".format(mode, params_mode, eps, adv_loss,
+                                                                                              clean_loss))
 
-            if save_models and mode != 'ista':
-                torch.save(model.state_dict(), '{0}_{1}_epochs_{2}.npy'.format(mode, eps, num_epochs))
+        # plot_loss_surface_trajectories(robust_model, clean_model, eps)
 
-            print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
-                                                                                          clean_loss))
+    #TODO Change this to plot the results of params
+    plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv)
 
-        plot_loss_surface_trajectories(robust_model, clean_model, eps)
-
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec,final_results_clean, final_results_adv)
 
 def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv):
     plt.figure()
     plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='robust-model-adv-data', color='b', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='clean_model-adv-data', color='r', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['ista'], label='ista-adv-data', color='g', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['robust_model']['solver'], label='robust-model(solver only)-adv-data', color='b', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['robust_model']['all'], label='robust-model(all params)-adv-data', color='r', linewidth=1)
     plt.xlabel('epsilon')
     plt.ylabel('MSE')
     plt.legend()
@@ -168,13 +154,12 @@ def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_resul
 
     plt.figure()
     plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='robust-model-clean-data', color='b',
+    plt.plot(adv_epsilon_vec, final_results_adv['clean_model']['solver'], label='clean-model(solver only)-adv-data', color='b',
              linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='clean_model-clean-data', color='r',
+    plt.plot(adv_epsilon_vec, final_results_adv['clean_model']['all'], label='clean_model (all params)-adv-data', color='r',
              linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['ista'], label='ista-clean-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
 
+    plt.xlabel('epsilon')
     plt.ylabel('MSE')
     plt.legend()
     plt.show()
@@ -264,23 +249,24 @@ class LISTA_Model(nn.Module):
 
 def lista_apply(train_loader, test_loader, T, H):
     lista = LISTA_Model.create_lista_model()
-    train(lista, train_loader, test_loader, save_models=True)
+    train(lista, train_loader, test_loader, num_epochs=def_num_epochs,attack_max_radius=def_attack_max_radius,
+          save_models=True)
     # validate(lista)
 
 
-if __name__ == '__main__':
-    from ista import ISTA
-
+def start():
     # number of unfolded iteartions
-
     T_LISTA = LISTA_Model.T_LISTA = 20
     # T_ISTA = 20 * T_LISTA
-
     # TODO play with the batch_size to reduce/increase adversarial examples. determine 1000=dataset.
     # Train and apply LISTA with T iterations / layers
     # ista_apply(test_loader, )
-    lista_mse_vs_iter = lista_apply(train_loader, test_loader, T_LISTA, H)
-    pass
+    lista_apply(train_loader, test_loader, T_LISTA, H)
+
+
+
+if __name__ == '__main__':
+    start()
 
     # Get these values from ISTA
     # (train_loader.dataset[0][0].float().unsqueeze(0), train_loader.dataset[0][1].float().unsqueeze(0))
@@ -290,7 +276,6 @@ if __name__ == '__main__':
     #
     # robust_model = LISTA_Model.create_lista_model()
     # clean_model.load_state_dict(torch.load('{0}_{1}_epochs_{2}.npy'.format('robust_model', '0.025', '10')))
-
 
     # Plot MSE vs epsilon graphs
 
@@ -315,8 +300,6 @@ if __name__ == '__main__':
 
     # TODO Loss surface - LISTA - NOT-PERTUBED LISTA-
     # torch.save(model.state_dict(), "model_robust_{0}.pt".format(eps))
-
-
 
 # def ista_apply(test_loader, T, H, rho=0.5):
 #     H = H.cpu()

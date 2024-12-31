@@ -2,6 +2,7 @@ __author__ = 'Elad Sofer <elad.g.sofer@gmail.com>'
 
 import copy
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 import torch
@@ -29,7 +30,7 @@ alpha = 0.4
 c = 1
 
 
-def BIM(model, x, L_gt, S_gt, eps=0.1, alpha=0.1, steps=5):
+def BIM(model, x, L_gt, S_gt, eps=0.1, alpha=0.1, steps=3):
     """
     The BIM (Basic Iterative Method) adversarial attack is a technique used to generate adversarial examples usually
      for machine learning models. This function aims to attack ADMM/ISTA optimizers.
@@ -257,7 +258,25 @@ class AccAltProj(nn.Module, LandscapeWrapper):
         """
         return cls(beta=beta, beta_init=beta_init, max_iter=max_iter, tol=tol, gamma=gamma, mu=mu)
 
+def generate_matrices(matrice_amount=100):
+    matrices = []
+    for i in range(matrice_amount):
+        # Generate a RPCA problem
+        A_generater = np.random.randn(m, r)
+        B_generater = np.random.randn(r, n)
+        L_true = np.dot(A_generater, B_generater)
+        norm_of_L_true = np.linalg.norm(L_true, 'fro')
 
+        S_supp_idx = np.random.choice(m * n, size=int(round(alpha * m * n)), replace=False)
+        S_range = c * np.mean(np.abs(L_true))
+        S_temp = 2 * S_range * np.random.rand(m, n) - S_range
+        S_true = np.zeros((m, n))
+        S_true.flat[S_supp_idx] = S_temp.flat[S_supp_idx]
+        norm_of_S_true = np.linalg.norm(S_true, 'fro')
+
+        D = L_true + S_true
+        matrices.append((torch.tensor(D), torch.tensor(S_true), torch.tensor(L_true)))
+    return matrices
 def execute():
     """
     Perform a series of operations on generated signals:
@@ -268,43 +287,52 @@ def execute():
     5. Aggregate the L2 norm ||s^* - s^*_{adv}|| for each signal and epsilon value.
     6. Plot the loss surfaces in various forms (3D, 2D, 1D) and other related graphs.
     """
-    # Generate a RPCA problem
-    A_generater = np.random.randn(m, r)
-    B_generater = np.random.randn(r, n)
-    L_true = np.dot(A_generater, B_generater)
-    norm_of_L_true = np.linalg.norm(L_true, 'fro')
 
-    S_supp_idx = np.random.choice(m * n, size=int(round(alpha * m * n)), replace=False)
-    S_range = c * np.mean(np.abs(L_true))
-    S_temp = 2 * S_range * np.random.rand(m, n) - S_range
-    S_true = np.zeros((m, n))
-    S_true.flat[S_supp_idx] = S_temp.flat[S_supp_idx]
-    norm_of_S_true = np.linalg.norm(S_true, 'fro')
+    matrices_N = 100
+    radius_n = 5
 
-    D = L_true + S_true
-    matrices = [(torch.tensor(D), torch.tensor(S_true), torch.tensor(L_true))]
+    matrices = generate_matrices(matrices_N)
     ##########################################################
-    radius_vec = [0.1, 0.001]
+
+    radius_vec = np.linspace(0.001, 0.1, radius_n)
+    #radius_vec = [0.1, 0.001]
+
+    attack_ratios_hist = dict.fromkeys(radius_vec,0)
+    adv_loss_hist = dict.fromkeys(radius_vec,0)
+    gt_loss = 0
+
+    # TODO think how to measure performance..
     for mat_idx, (D_original, S_original, L_original) in enumerate(matrices):
         # ISTA without an attack reconstruction
 
         AccAltProj_t_model = AccAltProj.create_AccAltProj()
-        L_gt, S_gt, err_gt = AccAltProj_t_model.forward(D_original.detach())
+        l_hat, s_hat, err_gt = AccAltProj_t_model.forward(D_original.detach())
         print("#### RPCA decomposition {0} convergence: iterations: {1} ####".format(mat_idx, len(err_gt)))
-        L_gt, S_gt = L_gt.detach(), S_gt.detach()
-
+        # L_gt, S_gt = L_gt.detach(), S_gt.detach()
+        gt_loss += (D_original - l_hat - s_hat).norm('fro').item()
         for e_idx, attack_eps in enumerate(radius_vec):
             print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(attack_eps))
             AccAltProj_adv_model = AccAltProj.create_AccAltProj()
 
-            adv_x, delta = BIM(AccAltProj_adv_model, D_original, S_original, L_original, eps=attack_eps)
-            adv_x = adv_x.detach()
+            adv_D, _ = BIM(AccAltProj_adv_model, D_original, S_original, L_original,
+                           alpha=0.01, eps=attack_eps, steps=4)
+            adv_D = adv_D.detach()
 
-            # s_attacked, err_attacked = ISTA_adv_model(adv_x)
+            L_adv, S_adv, _ = AccAltProj_adv_model(adv_D)
 
-            # print("Attacked-ISTA convergence: iterations: {0}".format(len(err_attacked)))
+            adv_loss_hist[attack_eps] += (torch.linalg.norm(D_original - L_adv - S_adv, 'fro')/torch.linalg.norm(D_original, 'fro')).item()
 
-            #dist_total[sig_idx, e_idx] = (s_gt - s_attacked).norm(2).item()
+            attack_ratios_hist[attack_eps] += (adv_D - D_original).norm(2) / D_original.norm(2)
+
+    gt_loss/=matrices_N
+    print("ground-truth loss is {0}".format(gt_loss))
+    loss_hist = {eps: total_loss/matrices_N for eps, total_loss in adv_loss_hist.items()}
+    plt.figure()
+    plt.plot(loss_hist.keys(), loss_hist.values())
+    plt.xlabel('epsilon')
+    plt.ylabel('Loss = ||D-L_adv-S_adv||/||D||')
+
+    plt.show()
 
     # ##########################################################
     # # np.save('data/stack/version1/matrices/ISTA_total_norm.npy', dist_total)

@@ -1,19 +1,16 @@
 import torch
-#torch.set_num_threads(10)
 import torch.utils.data as Data
 import torch.nn.functional as F
 import torch.nn as nn
 from scipy.linalg import eigvalsh
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, save_fig
+from utills import epoch, epoch_adversarial
 
-from ista import BIM, ISTA
 import copy
 
 from data import SimulatedData
 import matplotlib.pyplot as plt
-
 
 SEED = 0
 torch.manual_seed(SEED)
@@ -58,30 +55,33 @@ def create_data_set(H, n, m, k, N, batch_size=BATCH_SIZE, signal_dev=0.5, noise_
     return data_loader
 
 
-N = 1200  # number of samples
+N = 100  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
 # k = 4  # k-sparse signal
 
 # Signal generation configuration
-m, n, k = 1500, 256, 5
+# m, n, k = 1500, 256, 5
+n, m, k = 150, 200, 4
 
 # Measurement matrix
 H = torch.randn(n, m)
 H /= torch.norm(H, dim=0)
 
-import ista
+import admm
 
-ista.m = m
-ista.N = N
-ista.H = H
+admm.m = m
+admm.N = N
+admm.H = H
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
 test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
+from admm import BIM, ADMM
 
 def_attack_radius = 0.1
-def_num_epochs = 40
+def_num_epochs = 3
+
 
 def train(original_model, train_loader, valid_loader, num_epochs, attack_max_radius, save_models=False):
     """Train a network.
@@ -89,20 +89,17 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
         loss_test {numpy} -- loss function values on test set
     """
 
-    final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
-    final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
-    robust_model_bound =[]
-    clean_model_bound = []
-    #adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
-    # adv_epsilon_vec = [0.006, 0.025, 0.038, 0.055, 0.069, attack_max_radius]
-    adv_epsilon_vec = [0.069]
+    final_results_adv = {'admm': [], 'clean_model': [], 'robust_model': []}
+    final_results_clean = {'admm': [], 'clean_model': [], 'robust_model': []}
 
+    # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
+    adv_epsilon_vec = [0.006, 0.025, 0.038, 0.055, 0.069, attack_max_radius]
 
     for eps in adv_epsilon_vec:
         # Accumulate history for MSE vs epoch graph
         clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
-        for mode in ['ista', 'clean_model', 'robust_model']:
-            # # Initialization
+        for mode in ['clean_model', 'admm', 'robust_model']:
+            # Initialization
             if mode in ['clean_model', 'robust_model']:
                 model = copy.deepcopy(original_model)
                 optimizer = torch.optim.SGD(model.parameters(), lr=5e-05, momentum=0.9, weight_decay=0)
@@ -111,7 +108,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 for t in range(num_epochs):
                     model.train()
                     if mode == 'robust_model':
-                        train_loss, _ = epoch_adversarial(train_loader, model, BIM, opt=optimizer,
+                        train_loss = epoch_adversarial(train_loader, model, BIM, opt=optimizer,
                                                        scheduler=scheduler, eps=eps)
                     else:
                         train_loss = epoch(train_loader, model, opt=optimizer, scheduler=scheduler)
@@ -119,29 +116,27 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                     # Testing phase - Test upon clean & adversarial test examples
                     model.eval()
                     clean_loss = epoch(valid_loader, model)
-                    adv_loss, bound = epoch_adversarial(valid_loader, model, BIM, eps=eps)
+                    adv_loss = epoch_adversarial(valid_loader, model, BIM, eps=eps)
                     if mode == 'robust_model':
                         robust_model_adv.append(adv_loss)
                         robust_model_clean.append(clean_loss)
-                        robust_model_bound.append(bound.norm(2))
                     else:
                         clean_model_adv.append(adv_loss)
                         clean_model_clean.append(clean_loss)
-                        clean_model_bound.append(bound.norm(2))
 
                     print(*("{:.6f}".format(i) for i in (train_loss, clean_loss, adv_loss)), sep="\t")
             else:
 
-                ista_model = ISTA.create_ISTA(H=H, max_iter=1000)
+                admm_model = ADMM.create_ADMM(H=H, max_iter=1000)
                 adv_loss, clean_loss = 0., 0.
                 for X, y in valid_loader:
-                    yp, _ = ista_model(X)
+                    yp, _ = admm_model(X)
                     clean_loss += F.mse_loss(yp.T, y, reduction="sum").item()
                 clean_loss /= len(valid_loader.dataset)
 
                 for X, y in valid_loader:
-                    adv_x, _ = BIM(ista_model, X, y, eps=eps)
-                    yp_adv, _ = ista_model(adv_x)
+                    adv_x, _ = BIM(admm_model, X, y, eps=eps)
+                    yp_adv, _ = admm_model(adv_x)
                     adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
 
                 adv_loss /= len(valid_loader.dataset)
@@ -154,26 +149,23 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
             elif mode == 'clean_model':
                 clean_model = copy.deepcopy(model)
 
-            if save_models and mode != 'ista':
-                torch.save(model.state_dict(), 'lista_{0}_{1}_epochs_{2}.npy'.format(mode, eps, num_epochs))
-
-            # model = TheModelClass(*args, **kwargs)
-            # model.load_state_dict(torch.load(PATH, weights_only=True))
-            # model.eval()
+            if save_models and mode != 'admm':
+                torch.save(model.state_dict(), 'admm_{0}_{1}_epochs_{2}.npy'.format(mode, eps, num_epochs))
 
             print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
                                                                                           clean_loss))
 
         plot_loss_surface_trajectories(robust_model, clean_model, eps)
 
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec,final_results_clean, final_results_adv)
+    plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv)
+
 
 def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv):
     plt.figure()
     plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='robust-model-adv-data', color='b', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='clean_model-adv-data', color='r', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['ista'], label='ista-adv-data', color='g', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='admm-robust-model-adv-data', color='b', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='admm-clean_model-adv-data', color='r', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['admm'], label='admm-adv-data', color='g', linewidth=1)
     plt.xlabel('epsilon')
     plt.ylabel('MSE')
     plt.legend()
@@ -181,23 +173,23 @@ def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_resul
 
     plt.figure()
     plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='robust-model-clean-data', color='b',
+    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='admm-robust-model-clean-data', color='b',
              linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='clean_model-clean-data', color='r',
+    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='admm-clean_model-clean-data', color='r',
              linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['ista'], label='ista-clean-data', color='g', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_clean['admm'], label='admm-clean-data', color='g', linewidth=1)
     plt.xlabel('epsilon')
 
     plt.ylabel('MSE')
     plt.legend()
-    save_fig('lise_mse_graph.pdf')
     plt.show()
 
 
 def plot_loss_surface_trajectories(robust_model, clean_model, epsilon):
     # Plotting trajectories upon ISTA_gt loss surface
     x, s = train_loader.dataset[0][0].unsqueeze(0).T, train_loader.dataset[0][1].unsqueeze(0)
-    kwargs = ista.execute(signals=[(x.double(), s.double())], H_mat=H, plot_graphs=False, get_exec_params_mode=True)
+    signals = [(x.double(), s.double())]
+    kwargs = admm.execute(signals=signals, H_mat=H, plot_graphs=False, get_exec_params_mode=True)
     robust_model.eval()
     clean_model.eval()
 
@@ -227,122 +219,99 @@ def plot_loss_surface_trajectories(robust_model, clean_model, epsilon):
     plt.xlabel(r'$u_2$')
     plt.ylabel(r'$u_1$')
     # plt.style.use('plot_style.txt')
-    plt.title("ISTA loss surface with trajectories, epsilon={0}".format(epsilon))
+    plt.title("ADMM loss surface with trajectories, epsilon={0}".format(epsilon))
     # plt.savefig("ISTA_2D_LOSS_GT.pdf", bbox_inches='tight')
-    plt.legend(['LISTA-clean trajectory', 'LISTA-adv trajectory'])
-    save_fig('lista_loss_surface_{0}'.format(epsilon))
+    plt.legend(['LADMM-clean trajectory', 'LISTA-adv trajectory'])
     plt.show()
 
 
-class LISTA_Model(nn.Module):
-    T_LISTA = 20
-
-    def __init__(self, n, m, T=6, rho=1.0, H=None):
-        super(LISTA_Model, self).__init__()
+class LADMM_Model(nn.Module):
+    def __init__(self, n, m, T=6, rho=0.01, H=H, lambda_=12.5, mu=0.00005):
+        super(LADMM_Model, self).__init__()
         self.n, self.m = n, m
         self.H = H
-        self.T = T  # ISTA Iterations
-        self.rho = rho  # Lagrangian Multiplier
-        self.A = nn.Linear(n, m, bias=False)  # Weight Matrix
-        for p in self.A.parameters():
-            p.requires_grad = False
-        self.B = nn.Linear(m, m, bias=False)  # Weight Matrix
 
-        for p in self.B.parameters():
-            p.requires_grad = False
+        # ISTA Iterations
+        self.T = T
 
-        # ISTA Stepsizes eta
-        self.beta = nn.Parameter(torch.ones(T + 1, 1, 1), requires_grad=True)
-        self.mu = nn.Parameter(torch.ones(T + 1, 1, 1), requires_grad=True)
         # Initialization
-        if H is not None:
-            self.A.weight.data = H.t()
-            self.B.weight.data = H.t() @ H
+        self.rho = nn.Parameter(torch.ones(T + 1, 1, 1) * rho, requires_grad=True)  # Lagrangian Multiplier
+        self.lambda_ = nn.Parameter(torch.ones(T + 1, 1, 1) * lambda_, requires_grad=True)
+        self.mu = nn.Parameter(torch.ones(T + 1, 1, 1) * mu, requires_grad=True)
 
-
-
-    def _shrink(self, s, beta):
-        return beta * F.softshrink(s / beta, lambd=self.rho)
+    def _shrink(self, s, beta, rho):
+        return beta * F.softshrink(s / beta, lambd=rho)
 
     def forward(self, x, acc_s_hat=False):
+        """
 
-        s_hat_ls = []
+        Args:
+            x: a sparse signal observation
+        Returns: S reconstruction
+        """
+        # H.shape[1] = 200, x.shape[0[ = 512 (batch size)
+        # s_prev = torch.zeros(x.shape[0], self.H.shape[1])
+        u_prev = torch.zeros((x.shape[0], self.H.shape[1]))
+        v_prev = torch.zeros((x.shape[0], self.H.shape[1]))
 
-        s_hat = self._shrink(self.mu[0, :, :] * self.A(x), self.beta[0, :, :])
+        #################### Iteration 0 ####################
+
+        left_term = torch.linalg.inv(self.H.T @ self.H + self.rho[0, :, :] * torch.eye(self.H.shape[1]))
+
+        right_term = (self.H.T @ x.T).T + self.rho[0, :, :] * (v_prev - u_prev)
+
+        s = (left_term @ right_term.T).T
+        s_hat_ls = [s.detach()]
+        v = self._shrink(s + u_prev,
+                         self.rho[0, :, :] / (2 * self.lambda_[0, :, :]),
+                         rho=self.rho[0, :, :].item())
+        u = u_prev + self.mu[0, :, :] * (s - v)
+
+        #################### Iteration 1<=i<=K ####################
+
         for i in range(1, self.T + 1):
-            s_hat = self._shrink(s_hat - self.mu[i, :, :] * self.B(s_hat) + self.mu[i, :, :] * self.A(x),
-                                 self.beta[i, :, :], )
-            # Aggregate each iteration's MSE loss
+            s_prev, v_prev, u_prev = s, v, u
+
+            # left_term = (H^TH+rho*I)^-1
+            left_term = torch.linalg.inv(self.H.T @ self.H + self.rho[i, :, :] * torch.eye(self.H.shape[1]))
+
+            right_term = (self.H.T @ x.T).T + self.rho[i, :, :] * (v_prev - u_prev)
+
+            # Update s_k+1 = ((H^T)H+2λI)^−1(H^T x+2λ(vk−uk)).
+            s = (left_term @ right_term.T).T
             if acc_s_hat:
-                s_hat_ls.append(s_hat.detach())
-        return s_hat, s_hat_ls
+                s_hat_ls.append(s.detach())
+
+            # Update vk+1 = prox_(1/2λϕ)(sk+1 + uk)
+            v = self._shrink(s + u_prev, self.rho[i, :, :] / (2 * self.lambda_[i, :, :]), rho=self.rho[i, :, :].item())
+
+            # Update uk+1 = uk + μ (sk+1 − vk+1).
+            u = u_prev + self.mu[i, :, :] * (s - v)
+
+        return s, s_hat_ls
 
     @classmethod
-    def create_lista_model(cls, H=H):
+    def create_ladmm_model(cls, H, T):
         # Is there randomness at creating each time new instance?
         n = H.shape[0]
         m = H.shape[1]
-        return cls(n=n, m=m, T=cls.T_LISTA, H=H)
+        return cls(n=n, m=m, T=T)
 
 
-def lista_apply(train_loader, test_loader, T, H):
-    lista = LISTA_Model.create_lista_model()
+def ladmm_apply(train_loader, test_loader, T, H):
+    ladmm = LADMM_Model.create_ladmm_model(H, T)
+    train(ladmm, train_loader, test_loader, num_epochs=def_num_epochs,
+          attack_max_radius=def_attack_radius, save_models=True)
 
-    calculate_bound(lista, train_loader)
-    #train(lista, train_loader, test_loader, num_epochs=def_num_epochs,
-     #     attack_max_radius=def_attack_radius, save_models=True)
-    # validate(lista)
 
 def start():
-    T_LISTA = LISTA_Model.T_LISTA = 20
+    T_ADMM = 20
     # Train and apply LISTA with T iterations / layers
-    lista_apply(train_loader, test_loader, T_LISTA, H)
-
-
-def calculate_bound(original_model,dataloader,eps=0.069):
-
-    path_clean = '/Users/elad.sofer/src/ADVERSARIAL_SENSITIVTY_updated/data/models_history/lista_clean_model_0.006_epochs_40.npy'
-    path_adv = '/Users/elad.sofer/src/ADVERSARIAL_SENSITIVTY_updated/data/models_history/lista_robust_model_0.006_epochs_40.npy'
-    original_model.load_state_dict(torch.load(path_clean,weights_only=True))
-    lista_clean = copy.deepcopy(original_model)
-    lista_clean.eval()
-
-    original_model.load_state_dict(torch.load(path_adv, weights_only=True))
-    lista_robust = copy.deepcopy(original_model)
-    lista_robust.eval()
-
-    A_i_cl = [torch.eye(lista_clean.B.weight.shape[0]) - mu_i * lista_clean.B.weight for mu_i in list(lista_clean.mu)]
-    B_i_cl = [mu_i * lista_clean.A.weight for mu_i in list(lista_clean.mu)]
-
-    A_i_adv = [torch.eye(lista_robust.B.weight.shape[0]) - mu_i * lista_robust.B.weight for mu_i in
-              list(lista_robust.mu)]
-    B_i_adv = [mu_i * lista_robust.A.weight for mu_i in list(lista_robust.mu)]
-
-    delta_s_prev_cl = B_i_cl[0]
-    for i in range(1, LISTA_Model.T_LISTA):
-        delta_s_curr_cl = A_i_cl[i] @ delta_s_prev_cl + B_i_cl[i]
-        delta_s_prev_cl = delta_s_curr_cl.detach()
-
-    # Compute max singular value
-    singular_values = torch.svd(delta_s_curr_cl, ).S
-    cl_max_singular_value = singular_values.max()
-    print("clean {0}".format(cl_max_singular_value))
-
-    delta_s_prev_adv = B_i_adv[0]
-    for i in range(1, LISTA_Model.T_LISTA):
-        delta_s_curr_adv = A_i_adv[i] @ delta_s_prev_adv + B_i_adv[i]
-        delta_s_prev_adv = delta_s_curr_adv.detach()
-
-    # Compute max singular value
-    singular_values = torch.svd(delta_s_curr_adv, ).S
-    adv_max_singular_value = singular_values.max()
-    print("adv {0}".format(adv_max_singular_value))
+    ladmm_apply(train_loader, test_loader, T_ADMM, H)
 
 
 if __name__ == '__main__':
     start()
-
-
 
     # 1. MLSP
     # 2. RPCA attack
@@ -359,7 +328,6 @@ if __name__ == '__main__':
     #
     # robust_model = LISTA_Model.create_lista_model()
     # clean_model.load_state_dict(torch.load('{0}_{1}_epochs_{2}.npy'.format('robust_model', '0.025', '10')))
-
 
     # Plot MSE vs epsilon graphs
 
@@ -385,8 +353,6 @@ if __name__ == '__main__':
     # TODO Loss surface - LISTA - NOT-PERTUBED LISTA-
     # torch.save(model.state_dict(), "model_robust_{0}.pt".format(eps))
 
-
-
 # def ista_apply(test_loader, T, H, rho=0.5):
 #     H = H.cpu()
 #     m = H.shape[1]
@@ -402,9 +368,6 @@ if __name__ == '__main__':
 #     loss = np.array(loss)
 #
 #     return loss.mean()
-
-
-
 
 
 # def ista(x, H, b_s, rho=0.5, L=1, max_itr=300, threshold=1e-3):

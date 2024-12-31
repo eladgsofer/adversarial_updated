@@ -313,7 +313,7 @@ def save_fig(fname):
     The function saves the current figure to the specified file by using plt.savefig with the file path obtained by joining FIGURES_PATH and fname
     :param fname:  File name or path to save the figure.
     """
-    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight')
+    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf')
 
 
 if __name__ == '__main__':
@@ -364,15 +364,32 @@ def epoch(loader, model, opt=None, scheduler=None):
         scheduler.step()
     return total_loss / len(loader.dataset)
 
+import copy
+
+def calculate_bound_single_model(model, delta):
+    lista_model = copy.deepcopy(model)
+    lista_model.eval()
+    M_i = [torch.eye(lista_model.B.weight.shape[0]) - mu_i * lista_model.B.weight for mu_i in list(lista_model.mu)]
+    b_i = [mu_i * lista_model.A.weight for mu_i in list(lista_model.mu)]
+
+    delta_s_prev_cl = b_i[0] @ delta
+    for i in range(1, len(list(lista_model.mu))):
+        delta_s_curr_cl = M_i[i] @ delta_s_prev_cl + b_i[i] @ delta
+        delta_s_prev_cl = delta_s_curr_cl.detach()
+
+    return delta_s_curr_cl
 
 def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
+    bound = 0.
     for X, y in loader:
         # X, y = X.to(device), y.to(device)
-        adv_x, _ = attack(model, X, y, **kwargs)  # def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5):
+        adv_x, delta = attack(model, X, y, **kwargs)  # def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5):
         yp, e_loss = model(adv_x)
         loss = F.mse_loss(yp, y, reduction="sum")
+        if not opt:
+            bound += calculate_bound_single_model(model, delta)
         if opt:
             opt.zero_grad()
             loss.backward()
@@ -381,4 +398,4 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs)
         total_loss += loss.data.item()
     if scheduler:
         scheduler.step()
-    return total_loss / len(loader.dataset)
+    return total_loss / len(loader.dataset), bound/len(loader.dataset)
