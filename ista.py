@@ -142,7 +142,7 @@ class ISTA(nn.Module, LandscapeWrapper):
         return cls(H, step_size, rho, max_iter, eps_threshold)
 
 
-def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=False):
+def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=False, radius_vec=None):
     """
     Perform a series of operations on generated signals:
     1. Generate 'c' (set to 100) signals of the form x_i = Hs + w, where w follows a Gaussian distribution.
@@ -154,7 +154,8 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
     """
 
     dist_total = np.zeros((sig_amount, r_step))
-    radius_vec = np.linspace(eps_min, eps_max, r_step)
+    if not radius_vec:
+        radius_vec = np.linspace(eps_min, eps_max, r_step)
     if not signals:
         signals = []
         for i in range(sig_amount):
@@ -172,8 +173,7 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
         print("#### ISTA signal {0} convergence: iterations: {1} ####".format(sig_idx, len(err_gt)))
         s_gt = s_gt.detach()
 
-        # for e_idx, attack_eps in enumerate(radius_vec):
-        for e_idx, attack_eps in enumerate([0.025]):
+        for e_idx, attack_eps in enumerate(radius_vec):
             # print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(r))
             ISTA_adv_model = ISTA.create_ISTA(H=H_mat)
             adv_x, delta = BIM(ISTA_adv_model, x_original, s_original, eps=attack_eps)

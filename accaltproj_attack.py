@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch
 import seaborn as sns
 import time
-
+from utills import save_fig
 from utills import generate_signal, plot_conv_rec_graph, plot_3d_surface, \
     plot_2d_surface, plot_1d_surface, plot_norm_graph, plot_observations
 from utills import sig_amount, r_step, eps_min, eps_max, loss3d_res_steps
@@ -294,7 +294,7 @@ def execute():
     matrices = generate_matrices(matrices_N)
     ##########################################################
 
-    radius_vec = np.linspace(0.001, 0.1, radius_n)
+    radius_vec = np.linspace(0.0001, 0.01, radius_n)
     #radius_vec = [0.1, 0.001]
 
     attack_ratios_hist = dict.fromkeys(radius_vec,0)
@@ -322,16 +322,25 @@ def execute():
 
             adv_loss_hist[attack_eps] += (torch.linalg.norm(D_original - L_adv - S_adv, 'fro')/torch.linalg.norm(D_original, 'fro')).item()
 
-            attack_ratios_hist[attack_eps] += (adv_D - D_original).norm(2) / D_original.norm(2)
+            attack_ratios_hist[attack_eps] += ((adv_D - D_original).norm(2) / D_original.norm(2)).item()
 
     gt_loss/=matrices_N
     print("ground-truth loss is {0}".format(gt_loss))
     loss_hist = {eps: total_loss/matrices_N for eps, total_loss in adv_loss_hist.items()}
+    attack_ratios_hist = {eps: ratio / matrices_N for eps, ratio in attack_ratios_hist.items()}
+
     plt.figure()
     plt.plot(loss_hist.keys(), loss_hist.values())
     plt.xlabel('epsilon')
     plt.ylabel('Loss = ||D-L_adv-S_adv||/||D||')
+    save_fig('loss_rpca.pdf')
+    plt.show()
 
+    plt.figure()
+    plt.plot(attack_ratios_hist.keys(), attack_ratios_hist.values())
+    plt.xlabel('epsilon')
+    plt.ylabel('ratio')
+    save_fig('ratio_rpca.pdf')
     plt.show()
 
     # ##########################################################

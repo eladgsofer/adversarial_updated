@@ -165,7 +165,7 @@ class ADMM(nn.Module, LandscapeWrapper):
         return cls(H, step_size, lambda_, max_iter, eps_threshold, rho)
 
 
-def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=False):
+def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=False, radius_vec=None):
     """
     Perform a series of operations on generated signals:
     1. Generate 'c' (set to 100) signals of the form x_i = Hs + w, where w follows a Gaussian distribution.
@@ -187,7 +187,9 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
     # ADMM_min_distances = np.load('stack/version1/matrices/ADMM_total_norm.npy')
 
     dist_total = np.zeros((sig_amount, r_step))
-    radius_vec = np.linspace(eps_min, eps_max, r_step)
+    if not radius_vec:
+        radius_vec = np.linspace(eps_min, eps_max, r_step)
+
 
 
 
@@ -200,7 +202,7 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
         print("#### ADMM signal {0} convergence: iterations: {1} ####".format(sig_idx, len(err_gt)))
         s_gt = s_gt.detach()
 
-        for e_idx, attack_eps in enumerate([0.025]):
+        for e_idx, attack_eps in enumerate(radius_vec):
             # print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(r))
             ADMM_adv_model = ADMM.create_ADMM(H=H_mat)
 

@@ -5,6 +5,8 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+from data_utils import SimulatedData
+
 
 import torch.nn.functional as F
 from scipy.linalg import orth
@@ -31,6 +33,9 @@ This module comprises various utility functions for the project such as:
 FIGURES_PATH = r'data/graphs/'
 MATRICES_PATH = r'data/matrices/'
 
+PATH_CLEAN = 'data/models_history/lista_clean_model_{0}_epochs_40_MBDL_True.npy'
+PATH_ADV = 'data/models_history/lista_robust_model_{0}_epochs_40_MBDL_True.npy'
+
 
 # Attack configuration
 r_step = 40
@@ -47,6 +52,8 @@ Phi = np.random.randn(n, m)
 Phi = np.transpose(orth(np.transpose(Phi)))
 H = Phi
 H = torch.from_numpy(H).float()
+
+
 
 
 def generate_signal():
@@ -384,12 +391,9 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs)
     total_loss, total_err = 0., 0.
     bound = 0.
     for X, y in loader:
-        # X, y = X.to(device), y.to(device)
-        adv_x, delta = attack(model, X, y, **kwargs)  # def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5):
+        adv_x, delta = attack(model, X, y, **kwargs)
         yp, e_loss = model(adv_x)
         loss = F.mse_loss(yp, y, reduction="sum")
-        if not opt:
-            bound += calculate_bound_single_model(model, delta)
         if opt:
             opt.zero_grad()
             loss.backward()
@@ -398,4 +402,5 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs)
         total_loss += loss.data.item()
     if scheduler:
         scheduler.step()
-    return total_loss / len(loader.dataset), bound/len(loader.dataset)
+    return total_loss / len(loader.dataset)
+
