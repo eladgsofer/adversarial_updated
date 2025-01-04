@@ -37,7 +37,7 @@ m, n, k = 500, 256, 5
 H = torch.randn(n, m)
 H /= torch.norm(H, dim=0)
 
-import admm
+import classic_admm
 
 admm.m = m
 admm.N = N
@@ -45,7 +45,7 @@ admm.H = H
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
 test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
-from admm import BIM, ADMM
+from classic_admm import BIM, ADMM
 
 def_attack_radius = 0.1
 def_num_epochs = 40

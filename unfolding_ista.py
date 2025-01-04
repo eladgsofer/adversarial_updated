@@ -6,7 +6,7 @@ import random
 from utills import epoch, epoch_adversarial, save_fig, PATH_CLEAN, PATH_ADV
 from data import create_data_set
 
-from ista import BIM, ISTA
+from classic_ista import BIM, ISTA
 import copy
 
 from data import SimulatedData
@@ -36,7 +36,7 @@ m, n, k = 1500, 256, 5
 H = torch.randn(n, m)
 H /= torch.norm(H, dim=0)
 
-import ista
+import classic_ista
 
 ista.m = m
 ista.N = N
