@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 from data_utils import SimulatedData
 
-
 import torch.nn.functional as F
 from scipy.linalg import orth
 import matplotlib
@@ -32,11 +31,9 @@ This module comprises various utility functions for the project such as:
 
 FIGURES_PATH = r'data/graphs/'
 MATRICES_PATH = r'data/matrices/'
+MODELS_PATH = 'data/models_history/'
 
-PATH_CLEAN = 'data/models_history/lista_clean_model_{0}_epochs_40_MBDL_True.npy'
-PATH_ADV = 'data/models_history/lista_robust_model_{0}_epochs_40_MBDL_True.npy'
-
-
+MODEL_PATH_TEMPLATE = os.path.join(MODELS_PATH, '{model}_{mode}_{epsilon}_epochs_{epochs}_MBDL_{MBDL}_K={K}.npy')
 # Attack configuration
 r_step = 40
 sig_amount = 1
@@ -52,8 +49,6 @@ Phi = np.random.randn(n, m)
 Phi = np.transpose(orth(np.transpose(Phi)))
 H = Phi
 H = torch.from_numpy(H).float()
-
-
 
 
 def generate_signal():
@@ -110,7 +105,7 @@ def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, randomize=True, **kwargs):
         model.zero_grad()
 
         # Calculate loss
-        if s_gt.shape!=s_hat.shape:
+        if s_gt.shape != s_hat.shape:
             cost = loss(s_gt, s_hat.T)
         else:
             cost = loss(s_gt, s_hat)
@@ -223,7 +218,7 @@ def plot_3d_surface(z_adv, z_gt, steps, fname):
     plt.show()
 
 
-def plot_conv_rec_graph(signal_a, signal_b,s_gt, errors_a, errors_b,
+def plot_conv_rec_graph(signal_a, signal_b, s_gt, errors_a, errors_b,
                         fname="convergence_ADMM.pdf"):
     """
     This function plot_figure3 is used to plot Figure 3. It creates a figure with two subplots.
@@ -261,7 +256,6 @@ def plot_conv_rec_graph(signal_a, signal_b,s_gt, errors_a, errors_b,
 
 
 def plot_norm_graph(radius_vec, min_dist, fname):
-
     """
     Plots the norm graph, showing the relationship between the radius (epsilon) and the minimum distance between
     the optimal signal and the adversarial signal.
@@ -353,6 +347,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
 
+
 def epoch(loader, model, opt=None, scheduler=None):
     """Standard training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
@@ -371,7 +366,9 @@ def epoch(loader, model, opt=None, scheduler=None):
         scheduler.step()
     return total_loss / len(loader.dataset)
 
+
 import copy
+
 
 def calculate_bound_single_model(model, delta):
     lista_model = copy.deepcopy(model)
@@ -386,10 +383,10 @@ def calculate_bound_single_model(model, delta):
 
     return delta_s_curr_cl
 
+
 def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
-    bound = 0.
     for X, y in loader:
         adv_x, delta = attack(model, X, y, **kwargs)
         yp, e_loss = model(adv_x)
@@ -403,4 +400,3 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs)
     if scheduler:
         scheduler.step()
     return total_loss / len(loader.dataset)
-

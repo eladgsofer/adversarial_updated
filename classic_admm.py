@@ -179,6 +179,7 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
         H_mat = H
 
     if not signals:
+        signals = []
         # Generate signals
         for i in range(sig_amount):
             signals.append(generate_signal())
@@ -189,9 +190,6 @@ def execute(signals=None, H_mat=None, plot_graphs=True, get_exec_params_mode=Fal
     dist_total = np.zeros((sig_amount, r_step))
     if not radius_vec:
         radius_vec = np.linspace(eps_min, eps_max, r_step)
-
-
-
 
     ##########################################################
 

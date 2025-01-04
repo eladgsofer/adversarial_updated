@@ -9,13 +9,8 @@ import torch
 import seaborn as sns
 import time
 from utills import save_fig
-from utills import generate_signal, plot_conv_rec_graph, plot_3d_surface, \
-    plot_2d_surface, plot_1d_surface, plot_norm_graph, plot_observations
-from utills import sig_amount, r_step, eps_min, eps_max, loss3d_res_steps
+
 from visualize_model import LandscapeWrapper
-
-
-
 
 
 sns.set()
@@ -343,44 +338,6 @@ def execute():
     save_fig('ratio_rpca.pdf')
     plt.show()
 
-    # ##########################################################
-    # # np.save('data/stack/version1/matrices/ISTA_total_norm.npy', dist_total)
-    #
-    # plot_norm_graph(radius_vec, dist_total.mean(axis=0), fname='ISTA_norm2.pdf')
-    # x = x_original.detach()
-    #
-    # plot_observations(adv_x, x, fname="ISTA_observation.pdf")
-    # plot_conv_rec_graph(s_attacked.detach().numpy(), s_gt.detach().numpy(), s_original,
-    #                     err_attacked, err_gt, fname='ISTA_convergence.pdf')
-    #
-    # # Presenting last iteration signal loss surfaces for r=max_eps
-    # ISTA_adv_model.set_model_visualization_params()
-    # ISTA_t_model.set_model_visualization_params()
-    #
-    # # Extract loss surface
-    # dir_one, dir_two = ISTA_t_model.get_grid_vectors(ISTA_t_model, ISTA_adv_model)
-    #
-    # gt_line = ISTA_t_model.linear_interpolation(model_start=ISTA_t_model, model_end=ISTA_adv_model, x_sig=x,
-    #                                             deepcopy_model=True)
-    # adv_line = ISTA_t_model.linear_interpolation(model_start=ISTA_t_model, model_end=ISTA_adv_model, x_sig=adv_x,
-    #                                              deepcopy_model=True)
-    #
-    # # Plotting 1D
-    # plot_1d_surface(gt_line, adv_line, 'ISTA_1D_LOSS.pdf')
-    #
-    # Z_gt, Z_adv = ISTA_t_model.random_plane(gt_model=ISTA_t_model, adv_model=ISTA_adv_model,
-    #                                         adv_x=adv_x, x=x,
-    #                                         dir_one=dir_one, dir_two=dir_two,
-    #                                         steps=loss3d_res_steps)
-    #
-    # # np.save('data/stack/version1/matrices/ISTA_Z_adv.npy', Z_adv)
-    # # np.save('data/stack/version1/matrices/ISTA_Z_gt.npy', Z_gt)
-    #
-    # # Plotting 2D
-    # plot_2d_surface(Z_gt, Z_adv, 'ISTA_2D_LOSS.pdf')
-    #
-    # # Plotting 3D - https://jakevdp.github.io/PythonDataScienceHandbook/04.12-three-dimensional-plotting.html
-    # plot_3d_surface(z_adv=Z_adv, z_gt=Z_gt, steps=loss3d_res_steps, fname="ISTA_COMBINED_3D_LOSS.pdf")
 
 
 if __name__ == '__main__':

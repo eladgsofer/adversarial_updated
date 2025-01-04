@@ -87,8 +87,9 @@ class ISTA(nn.Module, LandscapeWrapper):
 
         for ii in range(self.max_iter):
             s_prev = self.s
-            # proximal gradient step #TODO check if x.T works in the regular version
-            #TODO maybe x.T is killing it...
+            # proximal gradient step
+            # TODO check if x.T works in the regular version maybe x.T is killing it...
+            # TODO check dtype in case of operating in classic mode (tensor and not numpy)
             temp = torch.matmul(self.H, s_prev) - x
 
             g_grad = s_prev - torch.mul(self.mu, torch.matmul(self.H.T, temp))

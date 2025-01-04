@@ -18,6 +18,7 @@ class SimulatedData(Data.Dataset):
         s = self.s[idx, :]
         return x, s
 
+
 def create_data_set(H, n, m, k, N, batch_size, signal_dev=0.5, noise_dev=0.01):
     # Initialization
     x = torch.zeros(N, n)
