@@ -1,6 +1,7 @@
 __author__ = 'Elad Sofer <elad.g.sofer@gmail.com>'
 
 import copy
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -260,14 +261,14 @@ def generate_matrices(matrice_amount=100):
         A_generater = np.random.randn(m, r)
         B_generater = np.random.randn(r, n)
         L_true = np.dot(A_generater, B_generater)
-        norm_of_L_true = np.linalg.norm(L_true, 'fro')
+        # norm_of_L_true = np.linalg.norm(L_true, 'fro')
 
         S_supp_idx = np.random.choice(m * n, size=int(round(alpha * m * n)), replace=False)
         S_range = c * np.mean(np.abs(L_true))
         S_temp = 2 * S_range * np.random.rand(m, n) - S_range
         S_true = np.zeros((m, n))
         S_true.flat[S_supp_idx] = S_temp.flat[S_supp_idx]
-        norm_of_S_true = np.linalg.norm(S_true, 'fro')
+        # norm_of_S_true = np.linalg.norm(S_true, 'fro')
 
         D = L_true + S_true
         matrices.append((torch.tensor(D), torch.tensor(S_true), torch.tensor(L_true)))
@@ -289,7 +290,7 @@ def execute():
     matrices = generate_matrices(matrices_N)
     ##########################################################
 
-    radius_vec = np.linspace(0.0001, 0.01, radius_n)
+    radius_vec = np.linspace(0.0001, 0.0005, radius_n)
     #radius_vec = [0.1, 0.001]
 
     attack_ratios_hist = dict.fromkeys(radius_vec,0)
@@ -320,9 +321,21 @@ def execute():
             attack_ratios_hist[attack_eps] += ((adv_D - D_original).norm(2) / D_original.norm(2)).item()
 
     gt_loss/=matrices_N
+
     print("ground-truth loss is {0}".format(gt_loss))
+
+
+    # with open('filename.pickle', 'rb') as handle:
+    #     b = pickle.load(handle)
+
     loss_hist = {eps: total_loss/matrices_N for eps, total_loss in adv_loss_hist.items()}
     attack_ratios_hist = {eps: ratio / matrices_N for eps, ratio in attack_ratios_hist.items()}
+
+    with open('rpca_loss_hist_{0}.pickle'.format(attack_eps), 'wb') as handle:
+        pickle.dump(loss_hist, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open('attack_ratios_hist_{0}.pickle'.format(attack_eps), 'wb') as handle:
+        pickle.dump(loss_hist, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     plt.figure()
     plt.plot(loss_hist.keys(), loss_hist.values())
@@ -335,7 +348,7 @@ def execute():
     plt.plot(attack_ratios_hist.keys(), attack_ratios_hist.values())
     plt.xlabel('epsilon')
     plt.ylabel('ratio')
-    save_fig('ratio_rpca.pdf')
+    save_fig('ratio_rpca_{0}.pdf')
     plt.show()
 
 

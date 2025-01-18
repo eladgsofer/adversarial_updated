@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from data_utils import SimulatedData
+import torchattacks
 
 import torch.nn.functional as F
 from scipy.linalg import orth
@@ -65,6 +66,79 @@ def generate_signal():
     x = torch.from_numpy(x).float()
     return x.detach(), s.detach()
 
+def CarliniWagner(model, x, s_gt, c):
+    cw_obj = torchattacks.CW(model, c=c)
+    return cw_obj(x, s_gt)
+# def NIFGSM(model, x, s_gt, eps):
+#     nifgsm_obj = torchattacks.NIFGSM(model, eps=100, alpha=0.01, steps=5)
+#     return nifgsm_obj(x, s_gt)
+
+
+def NIFGSM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, decay=1, randomize=True, **kwargs):
+    """
+    The BIM (Basic Iterative Method) adversarial attack is a technique used to generate adversarial examples usually
+     for machine learning models. This function aims to attack ADMM/ISTA optimizers.
+    :param model: ADMM/ISTA object, the target machine learning model to be attacked.
+    :param x: torch vector x - x=Hs+w s.t w~N(0,0.001)
+    :param s_gt: torch vector which represents s^*
+    :param eps:   A small perturbation magnitude that controls the strength of the attack
+    :param alpha: A step size parameter for adjusting the perturbation at each iteration
+    :param steps: The number of iterations to perform the attack.
+    :return: adversarial x signal and the pertubation which was applied.
+    """
+    # prev_conf = model.require_grad
+    # model.require_grad = False
+    # batch = False if 1 in x.shape else True
+    x = x.clone().to(device)
+    s_gt = s_gt.clone().to(device)
+    momentum = torch.zeros_like(x).detach()
+
+    loss = nn.MSELoss()
+
+    original_x = x.data
+    adv_x = x.clone().detach()
+
+    if randomize:
+        delta = torch.rand_like(adv_x, requires_grad=False)
+        delta.data = delta.data * 2 * eps - eps
+        delta.data = delta.clamp(-eps, eps)
+    else:
+        delta = torch.zeros_like(adv_x, requires_grad=False)
+
+    adv_x = adv_x + delta
+    for step in range(steps):
+        # print("BIM Step {0}".format(step))
+
+        adv_x.requires_grad = True
+        nes_x = adv_x + decay * alpha * momentum
+        s_hat, _ = model(nes_x, **kwargs)
+        model.zero_grad()
+
+        # Calculate loss
+        if s_gt.shape != s_hat.shape:
+            cost = loss(s_gt, s_hat.T)
+        else:
+            cost = loss(s_gt, s_hat)
+
+        # cost.backward(retain_graph=True)
+        grad = torch.autograd.grad(cost, adv_x)[0]
+        grad = decay*momentum + grad# /torch.mean(torch.abs(grad), dim=(1), keepdim=True)
+        momentum = grad
+
+        # Grad is calculated
+        delta = alpha * grad.sign()
+
+        # Stop following gradient changes
+        adv_x = adv_x.clone().detach()
+
+        adv_x = adv_x + delta
+
+        # Clip the change between the adversarial images and the original images to an epsilon range
+        eta = torch.clamp(adv_x - original_x, min=-eps, max=eps)
+
+        adv_x = original_x + eta
+
+    return adv_x, delta  # grad is the gradient (perturbation)
 
 def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, randomize=True, **kwargs):
     """
@@ -383,13 +457,28 @@ def calculate_bound_single_model(model, delta):
 
     return delta_s_curr_cl
 
-
-def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **kwargs):
+def get_attack_func(attack_name):
+    if attack_name == "CW":
+        return CarliniWagner
+    elif attack_name == "BIM":
+        return BIM
+    elif attack_name=="NIFGSM":
+        return NIFGSM
+    else:
+        raise Exception("not valid attack")
+def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
+    attack_method = get_attack_func(attack_name=attack)
+
     for X, y in loader:
-        adv_x, delta = attack(model, X, y, **kwargs)
+
+        adv_x, _ = attack_method(model, X, y, **attack_kwargs)
         yp, e_loss = model(adv_x)
+        # import matplotlib.pyplot as plt
+        # plt.plot(X[0].detach())
+        # plt.plot(adv_x[0].detach())
+        # plt.show()
         loss = F.mse_loss(yp, y, reduction="sum")
         if opt:
             opt.zero_grad()

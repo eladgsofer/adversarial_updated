@@ -17,7 +17,7 @@ sns.set()
 np.random.seed(0)
 
 # ISTA configuration
-step_size = 0.1
+step_size_mu = 0.1
 max_iter = 10000
 rho = 0.01
 eps_threshold = 1e-3
@@ -130,7 +130,7 @@ class ISTA(nn.Module, LandscapeWrapper):
         return copy.deepcopy(other)
 
     @classmethod
-    def create_ISTA(cls, H=H, step_size=step_size, rho=rho, max_iter=max_iter, eps_threshold=eps_threshold):
+    def create_ISTA(cls, H=H, step_size=step_size_mu, rho=rho, max_iter=max_iter, eps_threshold=eps_threshold):
         """
         Creates an instance of the ISTA class with the specified parameters.
         :param H: Sensing matrix.

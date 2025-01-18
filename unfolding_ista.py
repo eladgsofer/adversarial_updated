@@ -1,9 +1,10 @@
 import torch
 import torch.nn.functional as F
+import torchattacks
 import torch.nn as nn
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE
+from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func
 from data_utils import create_data_set
 
 import copy
@@ -18,9 +19,9 @@ random.seed(SEED)
 
 torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
-adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 
-N = 1200  # number of samples
+
+N = 400  # number of samples
 
 
 # n = 150  # dim(x)
@@ -43,8 +44,6 @@ classic_ista.H = H
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
 test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
 
-attack_radius = 0.9
-epochs = 40
 
 def inference(valid_loader, adv_epsilon_vec, save_figure,epochs):
     """
@@ -96,7 +95,7 @@ def inference(valid_loader, adv_epsilon_vec, save_figure,epochs):
 
     plot_mse_vs_epsilon_graphs(adv_epsilon_vec,final_results_clean, final_results_adv, save_figure)
 
-def train(original_model, train_loader, valid_loader, num_epochs, attack_max_radius, save_models=False, save_figures=True):
+def train(original_model, train_loader, valid_loader, num_epochs, attack, attack_magnitudes, save_models=False, save_figures=True):
     """Train a network.
     Returns:
         loss_test {numpy} -- loss function values on test set
@@ -104,11 +103,22 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
 
     final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
+    # TODO - train LISTA-clean only once
+
+    attack_mapper = {}
+
     #adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
-    for eps in adv_epsilon_vec:
+    for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
+        if attack in ["BIM", "NIFGSM"]:
+            attack_kwargs = dict(eps=eps)
+        elif attack == "CW":
+            attack_kwargs = dict(c=eps)
+        else:
+            raise Exception("Not implemented attack")
+
         clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
-        for mode in ['ista', 'clean_model', 'robust_model']:
+        for mode in ['robust_model', 'ista', 'clean_model']:
             # # Initialization
             if mode in ['clean_model', 'robust_model']:
                 model = copy.deepcopy(original_model)
@@ -118,15 +128,15 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 for t in range(num_epochs):
                     model.train()
                     if mode == 'robust_model':
-                        train_loss = epoch_adversarial(train_loader, model, classic_ista.BIM, opt=optimizer,
-                                                       scheduler=scheduler, eps=eps)
+                        train_loss = epoch_adversarial(train_loader, model, attack, opt=optimizer,
+                                                       scheduler=scheduler, **attack_kwargs)
                     else:
                         train_loss = epoch(train_loader, model, opt=optimizer, scheduler=scheduler)
 
                     # Testing phase - Test upon clean & adversarial test examples
                     model.eval()
                     clean_loss = epoch(valid_loader, model)
-                    adv_loss = epoch_adversarial(valid_loader, model, classic_ista.BIM, eps=eps)
+                    adv_loss = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
                     if mode == 'robust_model':
                         robust_model_adv.append(adv_loss)
                         robust_model_clean.append(clean_loss)
@@ -145,7 +155,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 clean_loss /= len(valid_loader.dataset)
 
                 for X, y in valid_loader:
-                    adv_x, _ = classic_ista.BIM(ista_model, X, y, eps=eps)
+                    adv_x, _ = get_attack_func(attack_name=attack)(ista_model, X, y, **attack_kwargs)
                     yp_adv, _ = ista_model(adv_x)
                     adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
 
@@ -161,7 +171,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
 
             if save_models and mode != 'ista':
                 path = MODEL_PATH_TEMPLATE.format(model='lista', mode=mode, epochs=num_epochs,
-                                                  epsilon=eps,MBDL=str(model.A_B_MBDL),K=LISTA_Model.T_LISTA)
+                                                  epsilon=eps,MBDL=str(model.A_B_MBDL), K=LISTA_Model.T_LISTA)
                 torch.save(model.state_dict(), path)
 
             print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
@@ -169,14 +179,15 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
 
         plot_loss_surface_trajectories(valid_loader,robust_model, clean_model, eps, save_figure=save_figures)
 
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec,final_results_clean, final_results_adv,save_figure=save_figures)
+    plot_mse_vs_epsilon_graphs(attack_magnitudes,final_results_clean, final_results_adv,save_figure=save_figures)
 
 
 
 class LISTA_Model(nn.Module):
+
     T_LISTA = 5
 
-    def __init__(self, n, m, T=6, rho=1.0, H=None, A_B_MBDL=True):
+    def __init__(self, n, m, T, rho=1.0, H=None, A_B_MBDL=True):
         super(LISTA_Model, self).__init__()
         self.n, self.m = n, m
         self.H = H
@@ -233,9 +244,24 @@ def load_model_eval_model(path):
     loaded_model.eval()
     return loaded_model
 
-def plot_bound_graph():
+def plot_bound_graph(adv_epsilon_vec):
 
-    cl_sing_max, adv_sing_max = [], []
+    # Calculate ISTA bound
+    # avg_number_ista_iterations = 300
+    # ista_obj = classic_ista.ISTA.create_ISTA()
+    # B_ista = ista_obj.mu*ista_obj.H.T
+    # tmp = ista_obj.mu*ista_obj.H.T@ista_obj.H
+    # A_ista = torch.eye(tmp.shape[0], tmp.shape[1]) - tmp
+    # delta_s_prev_ista = B_ista
+    # for i in range(1, avg_number_ista_iterations):
+    #     delta_s_curr_ista = A_ista@delta_s_prev_ista + B_ista
+    #     delta_s_prev_ista = delta_s_curr_ista
+    # # Compute max singular value
+    # singular_values = torch.svd(delta_s_curr_ista).S
+    # classic_ista_max_singular_value = singular_values.max()
+
+
+    cl_sing_max, adv_sing_max, classic_ista_sing_max = [], [], []
     for e in adv_epsilon_vec:
         cl_max_singular_value, adv_max_singular_value = calculate_bound(e)
         cl_sing_max.append(cl_max_singular_value.item())
@@ -244,6 +270,7 @@ def plot_bound_graph():
     plt.figure()
     plt.title(f'LISTA K={LISTA_Model.T_LISTA} bound')
     plt.plot(adv_epsilon_vec, cl_sing_max)
+    # plt.plot(adv_epsilon_vec, classic_ista_singular_value)
     plt.plot(adv_epsilon_vec, adv_sing_max)
     plt.legend(['clean-model', 'robust-model'])
     plt.ylabel('max singular value')
@@ -251,6 +278,9 @@ def plot_bound_graph():
     plt.show()
 
 def calculate_bound(eps):
+
+
+    # Calculate LISTA bounds
     path_clean = MODEL_PATH_TEMPLATE.format(model='lista', mode='clean_model', epsilon=eps, epochs=epochs,
                                             MBDL=str(True), K=LISTA_Model.T_LISTA)
     path_adv = MODEL_PATH_TEMPLATE.format(model='lista', mode='robust_model', epsilon=eps, epochs=epochs,
@@ -323,7 +353,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     # Plotting trajectories upon ISTA_gt loss surface
     x, s = validation_loader.dataset[0][0].unsqueeze(0).T, validation_loader.dataset[0][1].unsqueeze(0)
     kwargs = classic_ista.execute(signals=[(x.double(), s.double())], H_mat=H,
-                          plot_graphs=False, get_exec_params_mode=True, radius_vec=[epsilon])
+                                  plot_graphs=False, get_exec_params_mode=True, radius_vec=[epsilon])
     robust_model.eval()
     clean_model.eval()
 
@@ -377,14 +407,31 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
 
 if __name__ == '__main__':
 
-    T_LISTA = LISTA_Model.T_LISTA = 5
-
     # Train and apply LISTA with T iterations / layers
-    lista = LISTA_Model.create_lista_model()
+
     # inference(valid_loader=test_loader, adv_epsilon_vec=adv_epsilon_vec, save_figure=True, epochs=epochs)
-    # plot_bound_graph()
-    train(lista, train_loader, test_loader, num_epochs=epochs,
-          attack_max_radius=attack_radius, save_models=True, save_figures=False)
+
+    lista = LISTA_Model.create_lista_model()
+    epochs = 40
+
+    #adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+
+    # Attacks = BIM/CW/FGSM-NITRO
+
+    attack = "BIM"
+
+    if attack in ["BIM", "NIFGSM"]:
+        attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
+        attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+    elif attack == "CW":
+        attack_magnitudes = [1, 10, 100, 1000, 10000]
+    else:
+        raise Exception("Not implemented attack")
+
+    plot_bound_graph(attack_magnitudes)
+
+    # train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes,
+    #       num_epochs=epochs, save_models=True, save_figures=True)
 
 
     # 1. MLSP
