@@ -249,16 +249,17 @@ def plot_bound_graph(adv_epsilon_vec):
     # Calculate ISTA bound
     # avg_number_ista_iterations = 300
     # ista_obj = classic_ista.ISTA.create_ISTA()
-    # B_ista = ista_obj.mu*ista_obj.H.T
+    # B_ista = ista_obj.mu*torch.svd(ista_obj.H.T).S.max()
     # tmp = ista_obj.mu*ista_obj.H.T@ista_obj.H
-    # A_ista = torch.eye(tmp.shape[0], tmp.shape[1]) - tmp
-    # delta_s_prev_ista = B_ista
-    # for i in range(1, avg_number_ista_iterations):
-    #     delta_s_curr_ista = A_ista@delta_s_prev_ista + B_ista
-    #     delta_s_prev_ista = delta_s_curr_ista
-    # # Compute max singular value
-    # singular_values = torch.svd(delta_s_curr_ista).S
-    # classic_ista_max_singular_value = singular_values.max()
+    # M_ista = torch.svd(torch.eye(tmp.shape[0], tmp.shape[1]) - tmp).S.max()
+    #
+    # C_ista = 0
+    # for t in range(0, avg_number_ista_iterations):
+    #     prod_sum_ista_t = 1
+    #     for j in range(t+1, avg_number_ista_iterations):
+    #         prod_sum_ista_t*=M_ista
+    #
+    #     C_ista += prod_sum_ista_t*B_ista
 
 
     cl_sing_max, adv_sing_max, classic_ista_sing_max = [], [], []
@@ -289,34 +290,27 @@ def calculate_bound(eps):
     lista_clean = load_model_eval_model(path_clean)
     lista_robust = load_model_eval_model(path_adv)
 
-    A_i_cl = [torch.eye(lista_clean.B.weight.shape[0]) - mu_i * lista_clean.B.weight for mu_i in list(lista_clean.mu)]
-    B_i_cl = [mu_i * lista_clean.A.weight for mu_i in list(lista_clean.mu)]
+    M_i_cl = [torch.svd(torch.eye(lista_clean.B.weight.shape[0]) - mu_i * lista_clean.B.weight).S.max() for mu_i in list(lista_clean.mu)]
+    B_i_cl = [mu_i * torch.svd(lista_clean.A.weight).S.max() for mu_i in list(lista_clean.mu)]
 
-    A_i_adv = [torch.eye(lista_robust.B.weight.shape[0]) - mu_i * lista_robust.B.weight for mu_i in
+
+    M_i_adv = [torch.svd(torch.eye(lista_robust.B.weight.shape[0]) - mu_i * lista_robust.B.weight).S.max() for mu_i in
               list(lista_robust.mu)]
-    B_i_adv = [mu_i * lista_robust.A.weight for mu_i in list(lista_robust.mu)]
-
-    delta_s_prev_cl = B_i_cl[0]
-    for i in range(1, LISTA_Model.T_LISTA):
-        delta_s_curr_cl = A_i_cl[i] @ delta_s_prev_cl + B_i_cl[i]
-        delta_s_prev_cl = delta_s_curr_cl.detach()
-
-    # Compute max singular value
-    singular_values = torch.svd(delta_s_curr_cl, ).S
-    cl_max_singular_value = singular_values.max()
+    B_i_adv = [mu_i * torch.svd(lista_robust.A.weight).S.max() for mu_i in list(lista_robust.mu)]
 
 
-    delta_s_prev_adv = B_i_adv[0]
-    for i in range(1, LISTA_Model.T_LISTA):
-        delta_s_curr_adv = A_i_adv[i] @ delta_s_prev_adv + B_i_adv[i]
-        delta_s_prev_adv = delta_s_curr_adv.detach()
+    C_cl = 0
+    C_adv = 0
+    for t in range(0, LISTA_Model.T_LISTA):
+        prod_sum_cl_t = 1
+        prod_sum_adv_t = 1
+        for j in range(t+1, LISTA_Model.T_LISTA):
+            prod_sum_cl_t*=M_i_cl[j]
+            prod_sum_adv_t *= M_i_adv[j]
 
-    # Compute max singular value
-    singular_values = torch.svd(delta_s_curr_adv, ).S
-    adv_max_singular_value = singular_values.max()
-    return cl_max_singular_value, adv_max_singular_value
-
-
+        C_cl += prod_sum_cl_t*B_i_cl[t]
+        C_adv += prod_sum_adv_t*B_i_adv[t]
+    return C_cl, C_adv
 
 def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figure=False):
     plt.figure()
