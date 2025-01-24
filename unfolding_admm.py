@@ -69,7 +69,8 @@ def inference(valid_loader, save_figures=False):
         for mode in ['clean_model', 'admm', 'robust_model']:
             # Initialization
             if mode in ['clean_model', 'robust_model']:
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM', mode=mode, epsilon=eps, epochs=def_num_epochs,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM',N=N,
+                                                  mode=mode, epsilon=eps, epochs=def_num_epochs,
                                                   MBDL=str(True), K=T_ADMM)
                 model = load_model_eval_model(path)
                 clean_loss = epoch(valid_loader, model)
@@ -179,8 +180,8 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 clean_model = copy.deepcopy(model)
 
             if save_models and mode != 'admm':
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm',attack='BIM', mode=mode, epsilon=eps, epochs=num_epochs,
-                                                  MBDL=str(True), K=model.T)
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM', mode=mode,N=N,
+                                                  epsilon=eps, epochs=num_epochs, MBDL=str(True), K=model.T)
 
                 torch.save(model.state_dict(), path)
 

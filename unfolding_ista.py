@@ -19,7 +19,7 @@ random.seed(SEED)
 torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 
-N = 20  # number of samples
+N = 1200  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
@@ -187,6 +187,8 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
     object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
     save_object(plot_object, object_fname)
+    plot_defense_graph(attack_magnitudes, object_fname, 'LISTA')
+
     # plot_mse_vs_epsilon_graphs(attack_magnitudes, final_results_clean, final_results_adv, save_figure=save_figures)
 
 
@@ -328,7 +330,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     _, clean_s_hats_traj = clean_model.forward(x.T, acc_s_hat=True)
     kwargs['clean_trajectory'] = clean_s_hats_traj
     kwargs['adv_trajectory'] = adv_s_hats_traj
-    kwargs['steps'] = 20
+    kwargs['steps'] = 800
     kwargs['distance'] = 3
     Z_gt, Z_adv, traj_clean, traj_adv = kwargs['gt_model'].random_plane(**kwargs)
 
@@ -396,7 +398,7 @@ if __name__ == '__main__':
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    attack = "CW"
+    attack = "NIFGSM"
 
     if attack in ["BIM", "NIFGSM"]:
         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
@@ -408,7 +410,7 @@ if __name__ == '__main__':
     #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
     train(lista, train_loader, test_loader, attack=attack,
           attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-          save_models=False, save_figures=False)
+          save_models=True, save_figures=False)
 
 
 
