@@ -6,7 +6,7 @@ from scipy.linalg import eigvalsh
 from utills import save_fig
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE
+from utills import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE, save_object, plot_defense_graph
 from data_utils import create_data_set
 
 import copy
@@ -22,7 +22,7 @@ torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 T_ADMM = 5
 
-N = 1200  # number of samples
+N = 20  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
@@ -69,7 +69,7 @@ def inference(valid_loader, save_figures=False):
         for mode in ['clean_model', 'admm', 'robust_model']:
             # Initialization
             if mode in ['clean_model', 'robust_model']:
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', mode=mode, epsilon=eps, epochs=def_num_epochs,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM', mode=mode, epsilon=eps, epochs=def_num_epochs,
                                                   MBDL=str(True), K=T_ADMM)
                 model = load_model_eval_model(path)
                 clean_loss = epoch(valid_loader, model)
@@ -103,7 +103,11 @@ def inference(valid_loader, save_figures=False):
 
         plot_loss_surface_trajectories(robust_model, clean_model, eps, save_figures)
 
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figures)
+    plot_object = {'adv_epsilon_vec': adv_epsilon_vec, 'final_results_clean': final_results_clean,
+                   'final_results_adv': final_results_adv}
+    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"BIM".pkl'
+    save_object(plot_object, object_fname)
+    plot_defense_graph(adv_epsilon_vec, object_fname, "LADMM")
 
 
 def train(original_model, train_loader, valid_loader, num_epochs, attack_max_radius, save_models=False,
@@ -175,7 +179,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 clean_model = copy.deepcopy(model)
 
             if save_models and mode != 'admm':
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', mode=mode, epsilon=eps, epochs=num_epochs,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm',attack='BIM', mode=mode, epsilon=eps, epochs=num_epochs,
                                                   MBDL=str(True), K=model.T)
 
                 torch.save(model.state_dict(), path)
@@ -183,40 +187,13 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
             print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
                                                                                           clean_loss))
 
-        plot_loss_surface_trajectories(robust_model, clean_model, eps, save_figures=save_figures)
+        #plot_loss_surface_trajectories(robust_model, clean_model, eps, save_figures=save_figures)
 
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figures=save_figures)
-
-
-def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figures):
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='admm-robust-model-adv-data', color='b',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='admm-clean_model-adv-data', color='r',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['admm'], label='admm-adv-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figures:
-        save_fig('ladmm_adv_data_mse_graph.pdf')
-    plt.show()
-
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='admm-robust-model-clean-data', color='b',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='admm-clean_model-clean-data', color='r',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['admm'], label='admm-clean-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figures:
-        save_fig('ladmm_mse_clean_data_graph.pdf')
-    plt.show()
+    plot_object = {'adv_epsilon_vec': adv_epsilon_vec, 'final_results_clean': final_results_clean,
+                   'final_results_adv': final_results_adv}
+    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"BIM".pkl'
+    save_object(plot_object, object_fname)
+    plot_defense_graph(adv_epsilon_vec, object_fname, "LADMM")
 
 
 def load_model_eval_model(path):
@@ -244,7 +221,7 @@ def plot_loss_surface_trajectories(robust_model, clean_model, epsilon, save_figu
     _, clean_s_hats_traj = clean_model.forward(x.T, acc_s_hat=True)
     kwargs['clean_trajectory'] = clean_s_hats_traj
     kwargs['adv_trajectory'] = adv_s_hats_traj
-    kwargs['steps'] = 800
+    kwargs['steps'] = 20
     kwargs['distance'] = 3
     Z_gt, Z_adv, traj_clean, traj_adv = kwargs['gt_model'].random_plane(**kwargs)
     plt.figure()
@@ -278,7 +255,6 @@ def plot_loss_surface_trajectories(robust_model, clean_model, epsilon, save_figu
 
     # Styling
     plt.clabel(cs, inline=1, fontsize=10)
-    plt.colorbar(cs)
     plt.xlabel(r'$u_2$')
     plt.ylabel(r'$u_1$')
     # plt.style.use('plot_style.txt')
@@ -366,9 +342,9 @@ class LADMM_Model(nn.Module):
 if __name__ == '__main__':
     # Train and apply LISTA with T iterations / layers
     ladmm = LADMM_Model.create_ladmm_model(H, T_ADMM)
-    # inference(test_loader, save_figures=False)
-    train(ladmm, train_loader, test_loader, num_epochs=def_num_epochs,
-          attack_max_radius=def_attack_radius, save_models=True)
+    inference(test_loader, save_figures=False)
+    # train(ladmm, train_loader, test_loader, num_epochs=def_num_epochs,
+    #       attack_max_radius=def_attack_radius, save_models=True)
 
     # 1. MLSP
     # 2. RPCA attack

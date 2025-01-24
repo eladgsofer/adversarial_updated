@@ -1,16 +1,15 @@
 import torch
+from utills import plot_defense_graph
 import torch.nn.functional as F
 import torchattacks
 import torch.nn as nn
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func
+from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func, save_object
 from data_utils import create_data_set
-
 import copy
 
 import matplotlib.pyplot as plt
-
 
 SEED = 0
 torch.manual_seed(SEED)
@@ -20,9 +19,7 @@ random.seed(SEED)
 torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 
-
-N = 400  # number of samples
-
+N = 1200  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
@@ -45,7 +42,7 @@ train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
 test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
 
 
-def inference(valid_loader, adv_epsilon_vec, save_figure,epochs):
+def inference(valid_loader, adv_epsilon_vec, save_figure, epochs, attack):
     """
     validation - for plot recreation
     """
@@ -58,12 +55,12 @@ def inference(valid_loader, adv_epsilon_vec, save_figure,epochs):
             # # Initialization
             if mode in ['clean_model', 'robust_model']:
                 # Loading the model
-                path = MODEL_PATH_TEMPLATE.format(model='lista', mode=mode, epsilon=eps, epochs=epochs,
+                path = MODEL_PATH_TEMPLATE.format(model='lista', attack=attack, mode=mode, epsilon=eps, epochs=epochs,
                                                   MBDL=str(True), K=LISTA_Model.T_LISTA)
                 model = load_model_eval_model(path)
 
                 clean_loss = epoch(valid_loader, model)
-                adv_loss = epoch_adversarial(valid_loader, model, classic_ista.BIM, eps=eps)
+                adv_loss = epoch_adversarial(valid_loader, model, attack=attack, eps=eps)
 
             else:
                 ista_model = classic_ista.ISTA.create_ISTA(H=H, max_iter=1000)
@@ -91,11 +88,18 @@ def inference(valid_loader, adv_epsilon_vec, save_figure,epochs):
             print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
                                                                                           clean_loss))
 
-        plot_loss_surface_trajectories(valid_loader,robust_model,clean_model,eps,save_figure)
+        plot_loss_surface_trajectories(valid_loader, robust_model, clean_model, eps, save_figure)
 
-    plot_mse_vs_epsilon_graphs(adv_epsilon_vec,final_results_clean, final_results_adv, save_figure)
+    plot_object = {'adv_epsilon_vec': adv_epsilon_vec, 'final_results_clean': final_results_clean,
+                   'final_results_adv': final_results_adv}
 
-def train(original_model, train_loader, valid_loader, num_epochs, attack, attack_magnitudes, save_models=False, save_figures=True):
+    object_fname = f'LISTA_defense_eps_{str(adv_epsilon_vec)}_{attack}.pkl'
+    save_object(plot_object, object_fname)
+    plot_defense_graph(adv_epsilon_vec, object_fname, 'LISTA')
+
+
+def train(original_model, train_loader, valid_loader, num_epochs, attack, attack_magnitudes, save_models=False,
+          save_figures=True):
     """Train a network.
     Returns:
         loss_test {numpy} -- loss function values on test set
@@ -105,9 +109,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
     # TODO - train LISTA-clean only once
 
-    attack_mapper = {}
-
-    #adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
+    # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
         if attack in ["BIM", "NIFGSM"]:
@@ -170,21 +172,26 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                 clean_model = copy.deepcopy(model)
 
             if save_models and mode != 'ista':
-                path = MODEL_PATH_TEMPLATE.format(model='lista', mode=mode, epochs=num_epochs,
-                                                  epsilon=eps,MBDL=str(model.A_B_MBDL), K=LISTA_Model.T_LISTA)
+                path = MODEL_PATH_TEMPLATE.format(model='lista', attack=attack, mode=mode, epochs=num_epochs,
+                                                  epsilon=eps, MBDL=str(model.A_B_MBDL), K=LISTA_Model.T_LISTA)
                 torch.save(model.state_dict(), path)
 
             print("mode {0} epsilon {1} ISTA adversarial loss: {2} clean loss {3}".format(mode, eps, adv_loss,
                                                                                           clean_loss))
 
-        plot_loss_surface_trajectories(valid_loader,robust_model, clean_model, eps, save_figure=save_figures)
+    #     plot_loss_surface_trajectories(valid_loader, robust_model, clean_model, eps, save_figure=save_figures)
+    #
 
-    plot_mse_vs_epsilon_graphs(attack_magnitudes,final_results_clean, final_results_adv,save_figure=save_figures)
+    plot_object = {'adv_epsilon_vec': attack_magnitudes, 'final_results_clean': final_results_clean,
+                   'final_results_adv': final_results_adv}
+
+    object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
+    save_object(plot_object, object_fname)
+    # plot_mse_vs_epsilon_graphs(attack_magnitudes, final_results_clean, final_results_adv, save_figure=save_figures)
 
 
 
 class LISTA_Model(nn.Module):
-
     T_LISTA = 5
 
     def __init__(self, n, m, T, rho=1.0, H=None, A_B_MBDL=True):
@@ -212,8 +219,6 @@ class LISTA_Model(nn.Module):
             self.A.weight.data = H.t()
             self.B.weight.data = H.t() @ H
 
-
-
     def _shrink(self, s, beta):
         return beta * F.softshrink(s / beta, lambd=self.rho)
 
@@ -237,15 +242,16 @@ class LISTA_Model(nn.Module):
         m = H.shape[1]
         return cls(n=n, m=m, T=cls.T_LISTA, H=H)
 
+
 def load_model_eval_model(path):
     lista_model_temp = LISTA_Model.create_lista_model()
-    lista_model_temp.load_state_dict(torch.load(path,weights_only=True))
+    lista_model_temp.load_state_dict(torch.load(path, weights_only=True))
     loaded_model = copy.deepcopy(lista_model_temp)
     loaded_model.eval()
     return loaded_model
 
-def plot_bound_graph(adv_epsilon_vec):
 
+def plot_bound_graph(adv_epsilon_vec):
     # Calculate ISTA bound
     # avg_number_ista_iterations = 300
     # ista_obj = classic_ista.ISTA.create_ISTA()
@@ -261,84 +267,51 @@ def plot_bound_graph(adv_epsilon_vec):
     #
     #     C_ista += prod_sum_ista_t*B_ista
 
-
     cl_sing_max, adv_sing_max, classic_ista_sing_max = [], [], []
     for e in adv_epsilon_vec:
         cl_max_singular_value, adv_max_singular_value = calculate_bound(e)
         cl_sing_max.append(cl_max_singular_value.item())
         adv_sing_max.append(adv_max_singular_value.item())
 
-    plt.figure()
-    plt.title(f'LISTA K={LISTA_Model.T_LISTA} bound')
-    plt.plot(adv_epsilon_vec, cl_sing_max)
-    # plt.plot(adv_epsilon_vec, classic_ista_singular_value)
-    plt.plot(adv_epsilon_vec, adv_sing_max)
-    plt.legend(['clean-model', 'robust-model'])
-    plt.ylabel('max singular value')
-    plt.xlabel('epsilon')
-    plt.show()
+    norm_factor = max(cl_sing_max)
+    cl_sing_max = np.array(cl_sing_max) / norm_factor
+    adv_sing_max = np.array(adv_sing_max) / norm_factor
+
+    save_object({'LISTA': cl_sing_max, 'Robust-LISTA': adv_sing_max}, 'bound_graph_n=1200.pkl')
+
 
 def calculate_bound(eps):
-
-
     # Calculate LISTA bounds
-    path_clean = MODEL_PATH_TEMPLATE.format(model='lista', mode='clean_model', epsilon=eps, epochs=epochs,
+    path_clean = MODEL_PATH_TEMPLATE.format(model='lista', mode='clean_model', epsilon=eps, epochs=epochs, attack='BIM',
                                             MBDL=str(True), K=LISTA_Model.T_LISTA)
-    path_adv = MODEL_PATH_TEMPLATE.format(model='lista', mode='robust_model', epsilon=eps, epochs=epochs,
+
+    path_adv = MODEL_PATH_TEMPLATE.format(model='lista', mode='robust_model', epsilon=eps, epochs=epochs, attack='BIM',
                                           MBDL=str(True), K=LISTA_Model.T_LISTA)
 
     lista_clean = load_model_eval_model(path_clean)
     lista_robust = load_model_eval_model(path_adv)
 
-    M_i_cl = [torch.svd(torch.eye(lista_clean.B.weight.shape[0]) - mu_i * lista_clean.B.weight).S.max() for mu_i in list(lista_clean.mu)]
+    M_i_cl = [torch.svd(torch.eye(lista_clean.B.weight.shape[0]) - mu_i * lista_clean.B.weight).S.max() for mu_i in
+              list(lista_clean.mu)]
     B_i_cl = [mu_i * torch.svd(lista_clean.A.weight).S.max() for mu_i in list(lista_clean.mu)]
 
-
     M_i_adv = [torch.svd(torch.eye(lista_robust.B.weight.shape[0]) - mu_i * lista_robust.B.weight).S.max() for mu_i in
-              list(lista_robust.mu)]
+               list(lista_robust.mu)]
     B_i_adv = [mu_i * torch.svd(lista_robust.A.weight).S.max() for mu_i in list(lista_robust.mu)]
-
 
     C_cl = 0
     C_adv = 0
     for t in range(0, LISTA_Model.T_LISTA):
         prod_sum_cl_t = 1
         prod_sum_adv_t = 1
-        for j in range(t+1, LISTA_Model.T_LISTA):
-            prod_sum_cl_t*=M_i_cl[j]
+        for j in range(t + 1, LISTA_Model.T_LISTA):
+            prod_sum_cl_t *= M_i_cl[j]
             prod_sum_adv_t *= M_i_adv[j]
 
-        C_cl += prod_sum_cl_t*B_i_cl[t]
-        C_adv += prod_sum_adv_t*B_i_adv[t]
+        C_cl += prod_sum_cl_t * B_i_cl[t]
+        C_adv += prod_sum_adv_t * B_i_adv[t]
     return C_cl, C_adv
 
-def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figure=False):
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='robust-model-adv-data', color='b', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='clean_model-adv-data', color='r', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['ista'], label='ista-adv-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figure:
-        save_fig('LISTA_MSE_adv_data.pdf')
-    plt.show()
-
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='robust-model-clean-data', color='b',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='clean_model-clean-data', color='r',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['ista'], label='ista-clean-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figure:
-        save_fig('LISTA_MSE_clean_data.pdf')
-    plt.show()
 
 def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model, epsilon, save_figure=False):
     adv_color = 'red'
@@ -355,7 +328,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     _, clean_s_hats_traj = clean_model.forward(x.T, acc_s_hat=True)
     kwargs['clean_trajectory'] = clean_s_hats_traj
     kwargs['adv_trajectory'] = adv_s_hats_traj
-    kwargs['steps'] = 800
+    kwargs['steps'] = 20
     kwargs['distance'] = 3
     Z_gt, Z_adv, traj_clean, traj_adv = kwargs['gt_model'].random_plane(**kwargs)
 
@@ -367,6 +340,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     clean_y_cor = [t['j'] for t in traj_clean]
     adv_x_cor = [t['i'] for t in traj_adv]
     adv_y_cor = [t['j'] for t in traj_adv]
+
     # Scatter
     plt.scatter(adv_x_cor, adv_y_cor, color=adv_color, marker='x', zorder=5)
     plt.scatter(clean_x_cor, clean_y_cor, color=clean_color, marker='o', zorder=5)
@@ -376,6 +350,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     # Start/Stop text
     plt.text(adv_x_cor[0], adv_y_cor[0], 'Start', fontsize=12, color=adv_color, ha='right', va='top')
     plt.text(adv_x_cor[-1], adv_y_cor[-1], 'End', fontsize=12, color=adv_color, ha='right', va='top')
+
     # plot arrows
     for i in range(len(clean_x_cor) - 1):
         plt.arrow(clean_x_cor[i], clean_y_cor[i], clean_x_cor[i + 1] - clean_x_cor[i],
@@ -387,50 +362,63 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
                   zorder=6)
     # Styling
     plt.clabel(cs, inline=1, fontsize=10)
-    plt.colorbar(cs)
     plt.xlabel(r'$u_2$')
     plt.ylabel(r'$u_1$')
-    # plt.style.use('plot_style.txt')
-    plt.title("ISTA loss surface with trajectories, epsilon={0}".format(epsilon))
-    # plt.savefig("ISTA_2D_LOSS_GT.pdf", bbox_inches='tight')
-    plt.legend(['LISTA-clean trajectory', 'LISTA-adv trajectory'])
+    plt.grid(True)
+    plt.legend(['LISTA', 'Robust-LISTA'])
     if save_figure:
-        save_fig('lista_loss_surface_{0}.pdf'.format(epsilon))
+        save_fig('LISTA_trajectories_{0}.pdf'.format(epsilon))
     plt.show()
+
+def plot_trajectory_paper_graph():
+    # TRAJECTORY
+    path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
+                                      epsilon=0.025, epochs=40,
+                                      MBDL=str(True), K=5)
+
+    path_adv = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="robust_model",
+                                      epsilon=0.025, epochs=40,
+                                      MBDL=str(True), K=5)
+    clean = load_model_eval_model(path_cl)
+    adv = load_model_eval_model(path_adv)
+    plot_loss_surface_trajectories(test_loader, adv,clean,epsilon=0.025,save_figure=True)
+
 
 
 if __name__ == '__main__':
 
     # Train and apply LISTA with T iterations / layers
 
-    # inference(valid_loader=test_loader, adv_epsilon_vec=adv_epsilon_vec, save_figure=True, epochs=epochs)
-
     lista = LISTA_Model.create_lista_model()
     epochs = 40
 
-    #adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    attack = "BIM"
+    attack = "CW"
 
     if attack in ["BIM", "NIFGSM"]:
         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-        attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+        # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
     elif attack == "CW":
         attack_magnitudes = [1, 10, 100, 1000, 10000]
     else:
         raise Exception("Not implemented attack")
+    #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
+    train(lista, train_loader, test_loader, attack=attack,
+          attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+          save_models=False, save_figures=False)
 
-    plot_bound_graph(attack_magnitudes)
 
-    # train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes,
-    #       num_epochs=epochs, save_models=True, save_figures=True)
+
+
+
+    # plot_bound_graph(attack_magnitudes)
+
 
 
     # 1. MLSP
-    # 2. RPCA attack
-    # 3. Loss plots Robust LISTA vs LISTA vs ISTA
     # 4. Trajectory of LISTA/ LISTA_ADV upon ISTA loss surface
 
     # JL lemma - Johnson Lindenshtauch Lemma- norm0 vs norm 1

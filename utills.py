@@ -7,6 +7,9 @@ import torch
 import torch.nn as nn
 from data_utils import SimulatedData
 import torchattacks
+import numpy as np
+from scipy.interpolate import interp1d
+import copy
 
 import torch.nn.functional as F
 from scipy.linalg import orth
@@ -32,9 +35,11 @@ This module comprises various utility functions for the project such as:
 
 FIGURES_PATH = r'data/graphs/'
 MATRICES_PATH = r'data/matrices/'
-MODELS_PATH = 'data/models_history/'
+MODELS_PATH = r'data/models_history/'
+PKL_PATH = r'data/graph_pkl_files'
 
-MODEL_PATH_TEMPLATE = os.path.join(MODELS_PATH, '{model}_{mode}_{epsilon}_epochs_{epochs}_MBDL_{MBDL}_K={K}.npy')
+MODEL_PATH_TEMPLATE = os.path.join(MODELS_PATH,
+                                   '{model}_{attack}_{mode}_{epsilon}_epochs_{epochs}_MBDL_{MBDL}_K={K}.npy')
 # Attack configuration
 r_step = 40
 sig_amount = 1
@@ -66,9 +71,12 @@ def generate_signal():
     x = torch.from_numpy(x).float()
     return x.detach(), s.detach()
 
+
 def CarliniWagner(model, x, s_gt, c):
     cw_obj = torchattacks.CW(model, c=c)
     return cw_obj(x, s_gt)
+
+
 # def NIFGSM(model, x, s_gt, eps):
 #     nifgsm_obj = torchattacks.NIFGSM(model, eps=100, alpha=0.01, steps=5)
 #     return nifgsm_obj(x, s_gt)
@@ -122,7 +130,7 @@ def NIFGSM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, decay=1, randomize=True
 
         # cost.backward(retain_graph=True)
         grad = torch.autograd.grad(cost, adv_x)[0]
-        grad = decay*momentum + grad# /torch.mean(torch.abs(grad), dim=(1), keepdim=True)
+        grad = decay * momentum + grad  # /torch.mean(torch.abs(grad), dim=(1), keepdim=True)
         momentum = grad
 
         # Grad is calculated
@@ -139,6 +147,7 @@ def NIFGSM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, decay=1, randomize=True
         adv_x = original_x + eta
 
     return adv_x, delta  # grad is the gradient (perturbation)
+
 
 def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, randomize=True, **kwargs):
     """
@@ -388,38 +397,87 @@ def save_fig(fname):
     The function saves the current figure to the specified file by using plt.savefig with the file path obtained by joining FIGURES_PATH and fname
     :param fname:  File name or path to save the figure.
     """
-    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf')
+    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf', transparent=True)
 
 
-if __name__ == '__main__':
-    radius_vec = np.linspace(eps_min, eps_max, r_step)
-    ISTA_min_distances = np.load('data/stack/version1/matrices/ISTA_total_norm.npy')
-    ADMM_min_distances = np.load('data/stack/version1/matrices/ADMM_total_norm.npy')
+
+import pickle
+def save_object(object, fname):
+    with open(os.path.join(PKL_PATH, fname), 'wb') as fd:
+        pickle.dump(object, fd)
+
+def load_object(fname):
+    with open(os.path.join(PKL_PATH, fname), 'rb') as fd:
+        return pickle.load(fd)
+def plot_paper_graph(x, result_object, graph_fname,
+                     xlabel=r'$\epsilon$', ylabel=r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$',
+                     interpol_steps=150, load=True):
+
+    styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
+    X_ = np.linspace(x[0], x[-1], interpol_steps)
+    if load:
+        results = load_object(result_object)
+    else:
+        results = result_object
+    titles = []
     plt.figure()
-    # plt.style.use('plot_style.txt')
+    for idx, (title, y) in enumerate(results.items()):
+        titles.append(title)
+        cubic_interpolation_model = interp1d(x, y, kind="cubic")
+        Y_ = cubic_interpolation_model(X_)
+        plt.plot(X_, Y_, linestyle=styling[idx])
 
-    plt.plot(radius_vec, ADMM_min_distances.mean(axis=0), '.-')
-    plt.plot(radius_vec, ISTA_min_distances.mean(axis=0))
-    plt.xlabel(r'$\epsilon$')
-    plt.ylabel(r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$')
-    plt.legend(['ADMM', 'ISTA'])
-    save_fig('norm2_combined.pdf')
+
+    plt.legend(titles)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(True)
+    save_fig(graph_fname)
     plt.show()
 
-    x, s = generate_signal()
-    plt.figure(figsize=(8, 8))
-    plt.subplot(2, 1, 1)
-    plt.plot(x, label='observation')
-    plt.xlabel('Index', fontsize=10)
-    plt.ylabel('Value', fontsize=10)
+def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figure=False):
+    plt.figure()
+    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
+    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='robust-model-adv-data', color='b', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='clean_model-adv-data', color='r', linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_adv['ista'], label='ista-adv-data', color='g', linewidth=1)
+    plt.xlabel('epsilon')
+    plt.ylabel('MSE')
     plt.legend()
-    plt.subplot(2, 1, 2)
-
-    plt.plot(s[0], label='sparse signal', color='k')
-    plt.xlabel('Index', fontsize=10)
-    plt.ylabel('Value', fontsize=10)
-    plt.legend()
+    if save_figure:
+        save_fig('LISTA_MSE_adv_data.pdf')
     plt.show()
+
+    plt.figure()
+    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
+    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='robust-model-clean-data', color='b',
+             linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='clean_model-clean-data', color='r',
+             linewidth=1)
+    plt.plot(adv_epsilon_vec, final_results_clean['ista'], label='ista-clean-data', color='g', linewidth=1)
+    plt.xlabel('epsilon')
+
+    plt.ylabel('MSE')
+    plt.legend()
+    if save_figure:
+        save_fig('LISTA_MSE_clean_data.pdf')
+    plt.show()
+
+def plot_defense_graph(x, res_dict_path, algorithm):
+
+    res_object = load_object(res_dict_path)
+    clean_results = {algorithm: res_object['final_results_clean']['clean_model'],
+                     f'Robust-{algorithm}': res_object['final_results_clean']['robust_model'],
+                     str(algorithm[1:]): res_object['final_results_clean'][algorithm[1:].lower()]}
+
+    adv_results = {algorithm: res_object['final_results_adv']['clean_model'],
+                   f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
+                   str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
+
+    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}.pdf", load=False)
+    plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}.pdf", load=False)
+
+
 
 
 def epoch(loader, model, opt=None, scheduler=None):
@@ -441,9 +499,6 @@ def epoch(loader, model, opt=None, scheduler=None):
     return total_loss / len(loader.dataset)
 
 
-import copy
-
-
 def calculate_bound_single_model(model, delta):
     lista_model = copy.deepcopy(model)
     lista_model.eval()
@@ -457,15 +512,20 @@ def calculate_bound_single_model(model, delta):
 
     return delta_s_curr_cl
 
+
 def get_attack_func(attack_name):
+    if type(attack_name)!=str:
+        return attack_name
     if attack_name == "CW":
         return CarliniWagner
     elif attack_name == "BIM":
         return BIM
-    elif attack_name=="NIFGSM":
+    elif attack_name == "NIFGSM":
         return NIFGSM
     else:
         raise Exception("not valid attack")
+
+
 def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
@@ -489,3 +549,58 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
     if scheduler:
         scheduler.step()
     return total_loss / len(loader.dataset)
+
+if __name__ == '__main__':
+    attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+
+    #BOUND-GRAPH
+    # plot_paper_graph(attack_radius_vec,
+    #                  "bound_graph_n=1200.pkl",
+    #                  'bound_graph.pdf', ylabel=r'$\frac{C(\theta)}{||C(\theta)_{LISTA}||_2}$')
+
+    #DEFENSE-LISTA
+    # lista_defense_obj = f"/Users/elad.sofer/src/ADVERSARIAL_SENSITIVTY_updated/data/graph_pkl_files/LISTA_MSE_eps_{str(attack_radius_vec)}_BIM.pkl"
+    # plot_defense_graph(attack_radius_vec, lista_defense_obj, 'LISTA')
+
+    # DEFENSE-LADMM
+    # ladmm_object_fname = f'LADMM_defense_eps_{str(attack_radius_vec)}_"BIM".pkl'
+    # plot_defense_graph(attack_radius_vec, ladmm_object_fname, "LADMM")
+
+
+
+
+
+
+
+
+
+# if __name__ == '__main__':
+#     MLSP
+#     radius_vec = np.linspace(eps_min, eps_max, r_step)
+#     ISTA_min_distances = np.load('data/stack/version1/matrices/ISTA_total_norm.npy')
+#     ADMM_min_distances = np.load('data/stack/version1/matrices/ADMM_total_norm.npy')
+#     plt.figure()
+#     # plt.style.use('plot_style.txt')
+#
+#     plt.plot(radius_vec, ADMM_min_distances.mean(axis=0), '.-')
+#     plt.plot(radius_vec, ISTA_min_distances.mean(axis=0))
+#     plt.xlabel(r'$\epsilon$')
+#     plt.ylabel(r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$')
+#     plt.legend(['ADMM', 'ISTA'])
+#     save_fig('norm2_combined.pdf')
+#     plt.show()
+#
+#     x, s = generate_signal()
+#     plt.figure(figsize=(8, 8))
+#     plt.subplot(2, 1, 1)
+#     plt.plot(x, label='observation')
+#     plt.xlabel('Index', fontsize=10)
+#     plt.ylabel('Value', fontsize=10)
+#     plt.legend()
+#     plt.subplot(2, 1, 2)
+#
+#     plt.plot(s[0], label='sparse signal', color='k')
+#     plt.xlabel('Index', fontsize=10)
+#     plt.ylabel('Value', fontsize=10)
+#     plt.legend()
+#     plt.show()
