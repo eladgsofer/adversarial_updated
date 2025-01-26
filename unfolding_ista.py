@@ -39,7 +39,7 @@ classic_ista.N = N
 classic_ista.H = H
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
-test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
+test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N//3)
 
 
 def inference(valid_loader, adv_epsilon_vec, save_figure, epochs, attack):
@@ -398,19 +398,19 @@ if __name__ == '__main__':
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    attack = "CW"
+    for attack in ["CW", "NIFGSM", "BIM"]:
 
-    if attack in ["BIM", "NIFGSM"]:
-        attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-        # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
-    elif attack == "CW":
-        attack_magnitudes = [0.000001, 0.00001, 0.0001, 0.001, 0.1, 1]
-    else:
-        raise Exception("Not implemented attack")
-    #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-    train(lista, train_loader, test_loader, attack=attack,
-          attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-          save_models=True, save_figures=True)
+        if attack in ["BIM", "NIFGSM"]:
+            attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
+            # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+        elif attack == "CW":
+            attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
+        else:
+            raise Exception("Not implemented attack")
+        #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
+        train(lista, train_loader, test_loader, attack=attack,
+              attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+              save_models=True, save_figures=True)
 
 
 
