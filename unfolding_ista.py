@@ -398,19 +398,19 @@ if __name__ == '__main__':
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    attack = "NIFGSM"
+    attack = "CW"
 
     if attack in ["BIM", "NIFGSM"]:
         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
         # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
     elif attack == "CW":
-        attack_magnitudes = [1, 10, 100, 1000, 10000]
+        attack_magnitudes = [0.000001, 0.00001, 0.0001, 0.001, 0.1, 1]
     else:
         raise Exception("Not implemented attack")
     #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
     train(lista, train_loader, test_loader, attack=attack,
           attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-          save_models=True, save_figures=False)
+          save_models=True, save_figures=True)
 
 
 
