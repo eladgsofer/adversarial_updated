@@ -411,7 +411,7 @@ def load_object(fname):
         return pickle.load(fd)
 def plot_paper_graph(x, result_object, graph_fname,
                      xlabel=r'$\epsilon$', ylabel=r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$',
-                     interpol_steps=150, load=True):
+                     interpol_steps=150, load=True, interpolation=False):
 
     styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
     X_ = np.linspace(x[0], x[-1], interpol_steps)
@@ -423,13 +423,17 @@ def plot_paper_graph(x, result_object, graph_fname,
     plt.figure()
     for idx, (title, y) in enumerate(results.items()):
         titles.append(title)
-        cubic_interpolation_model = interp1d(x, y, kind="cubic")
-        Y_ = cubic_interpolation_model(X_)
-        plt.plot(X_, Y_, linestyle=styling[idx])
+        if interpolation:
+            cubic_interpolation_model = interp1d(x, y, kind="cubic")
+            Y_ = cubic_interpolation_model(X_)
+            plt.plot(X_, Y_, linestyle=styling[idx])
+        else:
+            plt.plot(x, y, linestyle=styling[idx])
 
 
     plt.legend(titles)
     plt.xlabel(xlabel)
+    plt.xscale('log')
     plt.ylabel(ylabel)
     plt.grid(True)
     save_fig(graph_fname)
@@ -474,8 +478,8 @@ def plot_defense_graph(x, res_dict_path, algorithm):
                    f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
                    str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
 
-    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}.pdf", load=False)
-    plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}.pdf", load=False)
+    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}.pdf", load=False, interpolation=False)
+    plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}.pdf", load=False, interpolation=False)
 
 
 
@@ -529,11 +533,13 @@ def get_attack_func(attack_name):
 def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_kwargs):
     """Adversarial training/evaluation epoch over the dataset"""
     total_loss, total_err = 0., 0.
+    l_inf_total = 0.
     attack_method = get_attack_func(attack_name=attack)
 
     for X, y in loader:
-
         adv_x, _ = attack_method(model, X, y, **attack_kwargs)
+        if attack=="CW":
+            l_inf_total+= abs(adv_x - X).max(axis=1)[0].sum().item()
         yp, e_loss = model(adv_x)
         # import matplotlib.pyplot as plt
         # plt.plot(X[0].detach())
@@ -548,10 +554,27 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
         total_loss += loss.data.item()
     if scheduler:
         scheduler.step()
-    return total_loss / len(loader.dataset)
+    return total_loss / len(loader.dataset), l_inf_total/len(loader.dataset)
 
 if __name__ == '__main__':
     attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+
+    from utills import plot_paper_graph
+
+    res_object = load_object(
+        "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl")
+
+    algorithm = "LISTA"
+    clean_results = {algorithm: res_object['final_results_clean']['clean_model'],
+                     f'Robust-{algorithm}': res_object['final_results_clean']['robust_model'],
+                     str(algorithm[1:]): res_object['final_results_clean'][algorithm[1:].lower()]}
+
+    adv_results = {algorithm: res_object['final_results_adv']['clean_model'],
+                   f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
+                   str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
+
+    plot_paper_graph(res_object['adv_epsilon_vec'], clean_results, f"defense_clean_data_{algorithm}.pdf", load=False,
+                     interpolation=False)
 
     #BOUND-GRAPH
     # plot_paper_graph(attack_radius_vec,

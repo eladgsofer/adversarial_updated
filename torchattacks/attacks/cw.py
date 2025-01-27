@@ -67,9 +67,6 @@ class CW(Attack):
         w = self.inverse_tanh_space(x=x).detach()
         w.requires_grad = True
 
-        MSELoss = nn.MSELoss(reduction="none")
-
-
         optimizer = optim.Adam([w], lr=self.lr)
 
         for step in range(self.steps):

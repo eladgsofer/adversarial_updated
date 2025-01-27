@@ -5,7 +5,7 @@ import torchattacks
 import torch.nn as nn
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func, save_object
+from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func, save_object, load_object
 from data_utils import create_data_set
 import copy
 
@@ -107,8 +107,9 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
     final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
+    final_results_l_inf = {'ista': [], 'clean_model': [], 'robust_model': []}
     # TODO - train LISTA-clean only once
-    ista_l_inf_cw = []
+
     # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
@@ -120,7 +121,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
             raise Exception("Not implemented attack")
 
         clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
-        for mode in ['ista', 'robust_model', 'clean_model']:
+        for mode in ['robust_model', 'clean_model', 'ista']:
             # # Initialization
             if mode in ['clean_model', 'robust_model']:
                 model = copy.deepcopy(original_model)
@@ -130,7 +131,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                 for t in range(num_epochs):
                     model.train()
                     if mode == 'robust_model':
-                        train_loss = epoch_adversarial(train_loader, model, attack, opt=optimizer,
+                        train_loss, _ = epoch_adversarial(train_loader, model, attack, opt=optimizer,
                                                        scheduler=scheduler, **attack_kwargs)
                     else:
                         train_loss = epoch(train_loader, model, opt=optimizer, scheduler=scheduler)
@@ -138,20 +139,17 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                     # Testing phase - Test upon clean & adversarial test examples
                     model.eval()
                     clean_loss = epoch(valid_loader, model)
-                    adv_loss = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
-                    if mode == 'robust_model':
-                        robust_model_adv.append(adv_loss)
-                        robust_model_clean.append(clean_loss)
+                    if attack=="CW":
+                        adv_loss, l_inf = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
                     else:
-                        clean_model_adv.append(adv_loss)
-                        clean_model_clean.append(clean_loss)
+                        adv_loss, _ = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
 
                     print(*("{:.6f}".format(i) for i in (train_loss, clean_loss, adv_loss)), sep="\t")
             else:
 
                 ista_model = classic_ista.ISTA.create_ISTA(H=H, max_iter=1000)
                 adv_loss, clean_loss = 0., 0.
-                L_inf = 0.
+                l_inf = 0.
                 for X, y in valid_loader:
                     yp, _ = ista_model(X)
                     clean_loss += F.mse_loss(yp.T, y, reduction="sum").item()
@@ -160,16 +158,17 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                 for X, y in valid_loader:
                     adv_x, _ = get_attack_func(attack_name=attack)(ista_model, X, y, **attack_kwargs)
                     if attack=="CW":
-                        L_inf += abs(adv_x - X).max(axis=1)[0].sum().item()
+                        l_inf += abs(adv_x - X).max(axis=1)[0].sum().item()
 
                     yp_adv, _ = ista_model(adv_x)
                     adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
-                L_inf /= len(valid_loader.dataset)
+                l_inf /= len(valid_loader.dataset)
                 adv_loss /= len(valid_loader.dataset)
             # Accumulate the last results for MSE vs epsilon graph
             final_results_adv[mode].append(adv_loss)
             final_results_clean[mode].append(clean_loss)
-            ista_l_inf_cw.append(L_inf)
+            if attack=="CW":
+                final_results_l_inf[mode].append(l_inf)
 
             if save_models and mode != 'ista':
                 path = MODEL_PATH_TEMPLATE.format(model='lista', attack=attack, mode=mode, epochs=num_epochs,
@@ -183,7 +182,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
     #
 
     plot_object = {'adv_epsilon_vec': attack_magnitudes, 'final_results_clean': final_results_clean,
-                   'final_results_adv': final_results_adv, 'ista_l_inf_cw': ista_l_inf_cw}
+                   'final_results_adv': final_results_adv, 'ista_l_inf_cw': final_results_l_inf}
 
     object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
     save_object(plot_object, object_fname)
@@ -398,7 +397,7 @@ if __name__ == '__main__':
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    for attack in ["CW", "NIFGSM", "BIM"]:
+    for attack in ["NIFGSM", "BIM"]:
 
         if attack in ["BIM", "NIFGSM"]:
             attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
@@ -412,9 +411,18 @@ if __name__ == '__main__':
               attack_magnitudes=attack_magnitudes, num_epochs=epochs,
               save_models=True, save_figures=True)
 
-
-
-
+    # plt.figure()
+    # plt.title('adversarial-data')
+    # plt.plot(res_obj['ista_l_inf_cw']['ista'], res_obj['final_results_adv']['ista'])
+    # plt.plot(res_obj['ista_l_inf_cw']['clean_model'], res_obj['final_results_adv']['clean_model'])
+    # plt.plot(res_obj['ista_l_inf_cw']['robust_model'], res_obj['final_results_adv']['robust_model'])
+    # plt.legend(['ISTA-adv-data', 'LISTA-adv-data', 'Robust-LISTA-adv-data'])
+    #
+    # plt.legend(['ISTA', 'LISTA', 'Robust-LISTA'])
+    #
+    # plt.xlabel('$\epsilon$')
+    # plt.ylabel('MSE')
+    # plt.show()
 
     # plot_bound_graph(attack_magnitudes)
 
