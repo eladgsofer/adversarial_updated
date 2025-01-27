@@ -22,7 +22,7 @@ torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 T_ADMM = 5
 
-N = 20  # number of samples
+N = 1500  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
@@ -31,7 +31,7 @@ N = 20  # number of samples
 # Signal generation configuration
 # m, n, k = 1500, 256, 5
 # n, m, k = 250, 500, 4
-m, n, k = 500, 256, 5
+m, n, k = 1200, 256, 5
 
 # Measurement matrix
 H = torch.randn(n, m)
@@ -44,7 +44,7 @@ classic_admm.N = N
 classic_admm.H = H
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
-test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N)
+test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N//4)
 
 def_attack_radius = 0.1
 def_num_epochs = 40
@@ -186,7 +186,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                 final_results_l_inf[mode].append(l_inf)
 
             if save_models and mode != 'admm':
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM', mode=mode,N=N,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack=attack, mode=mode,N=N,
                                                   epsilon=eps, epochs=num_epochs, MBDL=str(True), K=model.T)
 
                 torch.save(model.state_dict(), path)
@@ -350,8 +350,8 @@ class LADMM_Model(nn.Module):
 if __name__ == '__main__':
     # Train and apply LISTA with T iterations / layers
     ladmm = LADMM_Model.create_ladmm_model(H, T_ADMM)
-    inference(test_loader, save_figures=False)
-    for attack in ["CW","NIFGSM", "BIM"]:
+    #inference(test_loader, save_figures=False)
+    for attack in ["NIFGSM", "BIM", "CW"]:
 
         if attack in ["BIM", "NIFGSM"]:
             attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
