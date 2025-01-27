@@ -351,7 +351,7 @@ if __name__ == '__main__':
     # Train and apply LISTA with T iterations / layers
     ladmm = LADMM_Model.create_ladmm_model(H, T_ADMM)
     inference(test_loader, save_figures=False)
-    for attack in ["NIFGSM", "BIM"]:
+    for attack in ["CW","NIFGSM", "BIM"]:
 
         if attack in ["BIM", "NIFGSM"]:
             attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
