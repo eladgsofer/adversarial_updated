@@ -10,6 +10,7 @@ import torch
 import seaborn as sns
 import time
 from utills import save_fig
+from utills import save_object
 
 from visualize_model import LandscapeWrapper
 
@@ -331,17 +332,14 @@ def execute():
     loss_hist = {eps: total_loss/matrices_N for eps, total_loss in adv_loss_hist.items()}
     attack_ratios_hist = {eps: ratio / matrices_N for eps, ratio in attack_ratios_hist.items()}
 
-    with open('rpca_loss_hist_{0}.pickle'.format(attack_eps), 'wb') as handle:
-        pickle.dump(loss_hist, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    with open('attack_ratios_hist_{0}.pickle'.format(attack_eps), 'wb') as handle:
-        pickle.dump(loss_hist, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    save_object(loss_hist, 'RPCA_loss_hist_BIM.pkl')
+    save_object(attack_ratios_hist, 'RPCA_ratios_hist_BIM.pkl')
 
     plt.figure()
     plt.plot(loss_hist.keys(), loss_hist.values())
     plt.xlabel('epsilon')
     plt.ylabel('Loss = ||D-L_adv-S_adv||/||D||')
-    save_fig('loss_rpca.pdf')
+    plt.yscale('log')
     plt.show()
 
     plt.figure()

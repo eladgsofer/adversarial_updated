@@ -366,6 +366,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
     plt.xlabel(r'$u_2$')
     plt.ylabel(r'$u_1$')
     plt.grid(True)
+    plt.grid(True)
     plt.legend(['LISTA', 'Robust-LISTA'])
     if save_figure:
         save_fig('LISTA_trajectories_{0}.pdf'.format(epsilon))
@@ -374,11 +375,11 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
 def plot_trajectory_paper_graph():
     # TRAJECTORY
     path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
-                                      epsilon=0.025, epochs=40,
+                                      epsilon=0.005, epochs=40,
                                       MBDL=str(True), K=5)
 
     path_adv = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="robust_model",
-                                      epsilon=0.025, epochs=40,
+                                      epsilon=0.005, epochs=40,
                                       MBDL=str(True), K=5)
     clean = load_model_eval_model(path_cl)
     adv = load_model_eval_model(path_adv)
@@ -393,42 +394,27 @@ if __name__ == '__main__':
     lista = LISTA_Model.create_lista_model()
     epochs = 40
 
+    # Plot trajectory graph
+    plot_trajectory_paper_graph()
+
     # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    for attack in ["NIFGSM", "BIM"]:
+    # for attack in ["NIFGSM", "BIM"]:
+    #
+    #     if attack in ["BIM", "NIFGSM"]:
+    #         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
+    #         # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+    #     elif attack == "CW":
+    #         attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
+    #     else:
+    #         raise Exception("Not implemented attack")
 
-        if attack in ["BIM", "NIFGSM"]:
-            attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-            # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
-        elif attack == "CW":
-            attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
-        else:
-            raise Exception("Not implemented attack")
         #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-        train(lista, train_loader, test_loader, attack=attack,
-              attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-              save_models=True, save_figures=True)
+        # train(lista, train_loader, test_loader, attack=attack,
+        #       attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+        #       save_models=True, save_figures=True)
 
-    # plt.figure()
-    # plt.title('adversarial-data')
-    # plt.plot(res_obj['ista_l_inf_cw']['ista'], res_obj['final_results_adv']['ista'])
-    # plt.plot(res_obj['ista_l_inf_cw']['clean_model'], res_obj['final_results_adv']['clean_model'])
-    # plt.plot(res_obj['ista_l_inf_cw']['robust_model'], res_obj['final_results_adv']['robust_model'])
-    # plt.legend(['ISTA-adv-data', 'LISTA-adv-data', 'Robust-LISTA-adv-data'])
-    #
-    # plt.legend(['ISTA', 'LISTA', 'Robust-LISTA'])
-    #
-    # plt.xlabel('$\epsilon$')
-    # plt.ylabel('MSE')
-    # plt.show()
-
-    # plot_bound_graph(attack_magnitudes)
-
-
-
-    # 1. MLSP
-    # 4. Trajectory of LISTA/ LISTA_ADV upon ISTA loss surface
 
     # JL lemma - Johnson Lindenshtauch Lemma- norm0 vs norm 1

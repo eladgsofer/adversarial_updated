@@ -5,11 +5,15 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+from matplotlib.pyplot import ylabel
+
+
 from data_utils import SimulatedData
 import torchattacks
 import numpy as np
 from scipy.interpolate import interp1d
 import copy
+import pickle
 
 import torch.nn.functional as F
 from scipy.linalg import orth
@@ -401,7 +405,7 @@ def save_fig(fname):
 
 
 
-import pickle
+
 def save_object(object, fname):
     with open(os.path.join(PKL_PATH, fname), 'wb') as fd:
         pickle.dump(object, fd)
@@ -409,79 +413,6 @@ def save_object(object, fname):
 def load_object(fname):
     with open(os.path.join(PKL_PATH, fname), 'rb') as fd:
         return pickle.load(fd)
-def plot_paper_graph(x, result_object, graph_fname,
-                     xlabel=r'$\epsilon$', ylabel=r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$',
-                     interpol_steps=150, load=True, interpolation=False):
-
-    styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
-    X_ = np.linspace(x[0], x[-1], interpol_steps)
-    if load:
-        results = load_object(result_object)
-    else:
-        results = result_object
-    titles = []
-    plt.figure()
-    for idx, (title, y) in enumerate(results.items()):
-        titles.append(title)
-        if interpolation:
-            cubic_interpolation_model = interp1d(x, y, kind="cubic")
-            Y_ = cubic_interpolation_model(X_)
-            plt.plot(X_, Y_, linestyle=styling[idx])
-        else:
-            plt.plot(x, y, linestyle=styling[idx])
-
-
-    plt.legend(titles)
-    plt.xlabel(xlabel)
-    plt.xscale('log')
-    plt.ylabel(ylabel)
-    plt.grid(True)
-    save_fig(graph_fname)
-    plt.show()
-
-def plot_mse_vs_epsilon_graphs(adv_epsilon_vec, final_results_clean, final_results_adv, save_figure=False):
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_adv['robust_model'], label='robust-model-adv-data', color='b', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['clean_model'], label='clean_model-adv-data', color='r', linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_adv['ista'], label='ista-adv-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figure:
-        save_fig('LISTA_MSE_adv_data.pdf')
-    plt.show()
-
-    plt.figure()
-    plt.title('BIM max Epsilon {0}'.format(adv_epsilon_vec[-1]))
-    plt.plot(adv_epsilon_vec, final_results_clean['robust_model'], label='robust-model-clean-data', color='b',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['clean_model'], label='clean_model-clean-data', color='r',
-             linewidth=1)
-    plt.plot(adv_epsilon_vec, final_results_clean['ista'], label='ista-clean-data', color='g', linewidth=1)
-    plt.xlabel('epsilon')
-
-    plt.ylabel('MSE')
-    plt.legend()
-    if save_figure:
-        save_fig('LISTA_MSE_clean_data.pdf')
-    plt.show()
-
-def plot_defense_graph(x, res_dict_path, algorithm):
-
-    res_object = load_object(res_dict_path)
-    clean_results = {algorithm: res_object['final_results_clean']['clean_model'],
-                     f'Robust-{algorithm}': res_object['final_results_clean']['robust_model'],
-                     str(algorithm[1:]): res_object['final_results_clean'][algorithm[1:].lower()]}
-
-    adv_results = {algorithm: res_object['final_results_adv']['clean_model'],
-                   f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
-                   str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
-
-    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}.pdf", load=False, interpolation=False)
-    plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}.pdf", load=False, interpolation=False)
-
-
 
 
 def epoch(loader, model, opt=None, scheduler=None):
@@ -556,15 +487,44 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
         scheduler.step()
     return total_loss / len(loader.dataset), l_inf_total/len(loader.dataset)
 
-if __name__ == '__main__':
-    attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+def plot_paper_graph(x, result_object, graph_fname,
+                     xlabel=r'$\epsilon$', ylabel=r'${\| {s}^{\star} - {s}_{\rm adv}^{\star} \|}_2$',
+                     interpol_steps=150, load=True, interpolation=False, x_logscale=False):
 
-    from utills import plot_paper_graph
+    styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
+    X_ = np.linspace(x[0], x[-1], interpol_steps)
+    if load:
+        results = load_object(result_object)
+    else:
+        results = result_object
+    titles = []
+    plt.figure()
+    for idx, (title, y) in enumerate(results.items()):
+        titles.append(title)
+        if interpolation:
+            cubic_interpolation_model = interp1d(x, y, kind="cubic")
+            Y_ = cubic_interpolation_model(X_)
+            plt.plot(X_, Y_, linestyle=styling[idx])
+        else:
+            plt.plot(x, y, linestyle=styling[idx])
 
-    res_object = load_object(
-        "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl")
 
-    algorithm = "LISTA"
+    plt.legend(titles)
+    plt.xlabel(xlabel)
+    if x_logscale:
+        plt.xscale('log')
+    plt.ylabel(ylabel)
+    plt.grid(True)
+    save_fig(graph_fname)
+    plt.show()
+
+
+def plot_defense_graph(x, res_dict_path, algorithm,attack, **kwargs):
+
+    res_object = load_object(res_dict_path)
+    if type(x)==str:
+        x = res_object[x]
+
     clean_results = {algorithm: res_object['final_results_clean']['clean_model'],
                      f'Robust-{algorithm}': res_object['final_results_clean']['robust_model'],
                      str(algorithm[1:]): res_object['final_results_clean'][algorithm[1:].lower()]}
@@ -573,22 +533,51 @@ if __name__ == '__main__':
                    f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
                    str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
 
-    plot_paper_graph(res_object['adv_epsilon_vec'], clean_results, f"defense_clean_data_{algorithm}.pdf", load=False,
-                     interpolation=False)
+    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}_{attack}.pdf",ylabel='$\|\hat{s}-s^*\|_2$', **kwargs)
+    plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}_{attack}.pdf", **kwargs)
 
-    #BOUND-GRAPH
-    # plot_paper_graph(attack_radius_vec,
-    #                  "bound_graph_n=1200.pkl",
-    #                  'bound_graph.pdf', ylabel=r'$\frac{C(\theta)}{||C(\theta)_{LISTA}||_2}$')
+if __name__ == '__main__':
+    attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 
-    #DEFENSE-LISTA
-    # lista_defense_obj = f"/Users/elad.sofer/src/ADVERSARIAL_SENSITIVTY_updated/data/graph_pkl_files/LISTA_MSE_eps_{str(attack_radius_vec)}_BIM.pkl"
-    # plot_defense_graph(attack_radius_vec, lista_defense_obj, 'LISTA')
+    # # # Carlini-Wagner Defense - LISTA
+    lista_cw_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl"
+    plot_defense_graph(x='adv_epsilon_vec', res_dict_path=lista_cw_path, algorithm='LISTA', xlabel='$c$', attack='CW',
+                       load=False, interpolation=False, x_logscale=True)
 
-    # DEFENSE-LADMM
-    # ladmm_object_fname = f'LADMM_defense_eps_{str(attack_radius_vec)}_"BIM".pkl'
-    # plot_defense_graph(attack_radius_vec, ladmm_object_fname, "LADMM")
+    # # BIM - Defense - LISTA
+    lista_bim_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
+    plot_defense_graph(attack_radius_vec, lista_bim_path, attack="BIM", algorithm='LISTA',
+                       load=False, interpolation=True)
+    # # NIFGSM - Defense - LISTA
+    lista_nifgsm_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
+    plot_defense_graph(attack_radius_vec, lista_nifgsm_path, attack="NIFGSM", algorithm='LISTA',
+                       load=False, interpolation=True)
 
+    # LISTA Bound-Graph
+    plot_paper_graph(attack_radius_vec,
+                     "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/bound_graph_n=1200.pkl",
+                     'LISTA_bound_graph.pdf', ylabel=r'$C(\theta)}$')
+
+    # BIM Defense - LADMM
+    ladmm_bim_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
+    plot_defense_graph(attack_radius_vec, ladmm_bim_path, attack="BIM", algorithm='LADMM',
+                       load=False, interpolation=True)
+
+    ladmm_nifgsm_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
+    plot_defense_graph(attack_radius_vec, ladmm_nifgsm_path, attack="NIFGSM", algorithm='LADMM',
+                       load=False, interpolation=True)
+
+    # Attack graph
+    admm_bim = load_object(ladmm_bim_path)["final_results_adv"]["admm"]
+    admm_nifgsm = load_object(ladmm_nifgsm_path)["final_results_adv"]["admm"]
+    ista_bim = load_object(lista_bim_path)["final_results_adv"]["ista"]
+    ista_nifgsm = load_object(lista_nifgsm_path)["final_results_adv"]["ista"]
+
+    vanilla_algo_attacks = {"ADMM-BIM": admm_bim, "ADMM-NIFGSM": admm_nifgsm,
+                            "ISTA-BIM": ista_bim, "ISTA-NIFGSM": ista_nifgsm}
+    plot_paper_graph(attack_radius_vec, vanilla_algo_attacks, "vanilla_attack.pdf", load=False,interpolation=True)
+
+    # trajectory graph - from LISTA.py
 
 
 
