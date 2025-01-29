@@ -10,6 +10,9 @@ from data_utils import create_data_set
 import copy
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set_style("whitegrid")  # Use a white background with gridlines
 
 SEED = 0
 torch.manual_seed(SEED)
@@ -372,18 +375,18 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
         save_fig('LISTA_trajectories_{0}.pdf'.format(epsilon))
     plt.show()
 
-def plot_trajectory_paper_graph():
+def plot_trajectory_paper_graph(epsilon=0.005):
     # TRAJECTORY
     path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
-                                      epsilon=0.005, epochs=40,
+                                      epsilon=epsilon, epochs=40,
                                       MBDL=str(True), K=5)
 
     path_adv = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="robust_model",
-                                      epsilon=0.005, epochs=40,
+                                      epsilon=epsilon, epochs=40,
                                       MBDL=str(True), K=5)
     clean = load_model_eval_model(path_cl)
     adv = load_model_eval_model(path_adv)
-    plot_loss_surface_trajectories(test_loader, adv,clean,epsilon=0.025,save_figure=True)
+    plot_loss_surface_trajectories(test_loader, adv,clean,epsilon=epsilon,save_figure=True)
 
 
 
@@ -395,7 +398,7 @@ if __name__ == '__main__':
     epochs = 40
 
     # Plot trajectory graph
-    plot_trajectory_paper_graph()
+    plot_trajectory_paper_graph(epsilon=0.025)
 
     # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 

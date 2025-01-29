@@ -2,13 +2,11 @@ __author__ = 'Elad Sofer <elad.g.sofer@gmail.com>'
 
 import os
 
-import numpy as np
 import torch
 import torch.nn as nn
-from matplotlib.pyplot import ylabel
+import seaborn as sns
+sns.set_style("whitegrid")  # Use a white background with gridlines
 
-
-from data_utils import SimulatedData
 import torchattacks
 import numpy as np
 from scipy.interpolate import interp1d
@@ -79,11 +77,6 @@ def generate_signal():
 def CarliniWagner(model, x, s_gt, c):
     cw_obj = torchattacks.CW(model, c=c)
     return cw_obj(x, s_gt)
-
-
-# def NIFGSM(model, x, s_gt, eps):
-#     nifgsm_obj = torchattacks.NIFGSM(model, eps=100, alpha=0.01, steps=5)
-#     return nifgsm_obj(x, s_gt)
 
 
 def NIFGSM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, decay=1, randomize=True, **kwargs):
@@ -396,12 +389,13 @@ def plot_observations(adv_x, x, fname):
     plt.show()
 
 
-def save_fig(fname):
+def save_fig(fname, transparent=True):
     """
     The function saves the current figure to the specified file by using plt.savefig with the file path obtained by joining FIGURES_PATH and fname
     :param fname:  File name or path to save the figure.
     """
-    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf', transparent=True)
+
+    plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf', transparent=transparent)
 
 
 
@@ -489,7 +483,7 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
 
 def plot_paper_graph(x, result_object, graph_fname,
                      xlabel=r'$\epsilon$', ylabel=r'${\| {s}^{\star} - {s}_{\rm adv}^{\star} \|}_2$',
-                     interpol_steps=150, load=True, interpolation=False, x_logscale=False):
+                     interpol_steps=150, load=True, interpolation=False, x_logscale=False, y_logscale=False):
 
     styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
     X_ = np.linspace(x[0], x[-1], interpol_steps)
@@ -513,6 +507,8 @@ def plot_paper_graph(x, result_object, graph_fname,
     plt.xlabel(xlabel)
     if x_logscale:
         plt.xscale('log')
+    if y_logscale:
+        plt.yscale('log')
     plt.ylabel(ylabel)
     plt.grid(True)
     save_fig(graph_fname)
@@ -556,16 +552,16 @@ if __name__ == '__main__':
     # LISTA Bound-Graph
     plot_paper_graph(attack_radius_vec,
                      "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/bound_graph_n=1200.pkl",
-                     'LISTA_bound_graph.pdf', ylabel=r'$C(\theta)}$')
+                     'LISTA_bound_graph.pdf', ylabel=r'$C(\theta)}$',interpolation=True)
 
     # BIM Defense - LADMM
     ladmm_bim_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
-    plot_defense_graph(attack_radius_vec, ladmm_bim_path, attack="BIM", algorithm='LADMM',
-                       load=False, interpolation=True)
+    plot_defense_graph(attack_radius_vec, ladmm_bim_path, attack="BIM",
+                       algorithm='LADMM', load=False, interpolation=True)
 
     ladmm_nifgsm_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
-    plot_defense_graph(attack_radius_vec, ladmm_nifgsm_path, attack="NIFGSM", algorithm='LADMM',
-                       load=False, interpolation=True)
+    plot_defense_graph(attack_radius_vec, ladmm_nifgsm_path, attack="NIFGSM",
+                       algorithm='LADMM', load=False, interpolation=True)
 
     # Attack graph
     admm_bim = load_object(ladmm_bim_path)["final_results_adv"]["admm"]
