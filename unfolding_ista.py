@@ -111,9 +111,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
     final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_l_inf = {'ista': [], 'clean_model': [], 'robust_model': []}
-    # TODO - train LISTA-clean only once
 
-    # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
         if attack in ["BIM", "NIFGSM"]:
@@ -375,7 +373,7 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
         save_fig('LISTA_trajectories_{0}.pdf'.format(epsilon))
     plt.show()
 
-def plot_trajectory_paper_graph(epsilon=0.005):
+def plot_trajectory_paper_graph(epsilon):
     # TRAJECTORY
     path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
                                       epsilon=epsilon, epochs=40,
@@ -400,24 +398,20 @@ if __name__ == '__main__':
     # Plot trajectory graph
     plot_trajectory_paper_graph(epsilon=0.025)
 
-    # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
-
     # Attacks = BIM/CW/FGSM-NITRO
 
-    # for attack in ["NIFGSM", "BIM"]:
-    #
-    #     if attack in ["BIM", "NIFGSM"]:
-    #         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-    #         # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
-    #     elif attack == "CW":
-    #         attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
-    #     else:
-    #         raise Exception("Not implemented attack")
+    for attack in ["NIFGSM", "BIM", "CW"]:
 
-        #inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-        # train(lista, train_loader, test_loader, attack=attack,
-        #       attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-        #       save_models=True, save_figures=True)
+        if attack in ["BIM", "NIFGSM"]:
+            attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
+            # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+        elif attack == "CW":
+            attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
+        else:
+            raise Exception("Not implemented attack")
+
+        # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
+        train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+              save_models=True, save_figures=True)
 
 
-    # JL lemma - Johnson Lindenshtauch Lemma- norm0 vs norm 1
