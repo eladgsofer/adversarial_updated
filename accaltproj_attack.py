@@ -412,6 +412,7 @@ if __name__ == '__main__':
     matrices_N = 100
     radius_vec = list(np.linspace(0.003, 0.03, radius_n))
     x = [0.003, 0.00975, 0.0165, 0.02325, 0.03]
+    # was created via the school's Macbook
     bim = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_BIM.pkl")
     nifgsm = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_NIFGSM.pkl")
 
