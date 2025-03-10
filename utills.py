@@ -5,7 +5,7 @@ import os
 import torch
 import torch.nn as nn
 import seaborn as sns
-sns.set_style("whitegrid")  # Use a white background with gridlines
+
 
 import torchattacks
 import numpy as np
@@ -484,7 +484,7 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
 def plot_paper_graph(x, result_object, graph_fname,
                      xlabel=r'$\epsilon$', ylabel=r'${\| {s}^{\star} - {s}_{\rm adv}^{\star} \|}_2$',
                      interpol_steps=150, load=True, interpolation=False, x_logscale=False, y_logscale=False):
-
+    sns.set_style("whitegrid")  # Use a white background with gridlines
     styling = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1)), (0, (3, 1, 1, 1, 1, 1))]
     X_ = np.linspace(x[0], x[-1], interpol_steps)
     if load:

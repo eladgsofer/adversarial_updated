@@ -161,7 +161,6 @@ class AccAltProj(nn.Module, LandscapeWrapper):
     def __init__(self, beta=None, beta_init=None, max_iter=100, tol=1e-2, gamma=0.7, mu=5):
         super(AccAltProj, self).__init__()
 
-        self.mu = torch.tensor(mu)
         self.gamma = torch.tensor(gamma)
         if beta is None:
             self.beta = 1 / (2 * np.power(m * n, 1 / 4))
@@ -412,18 +411,16 @@ if __name__ == '__main__':
     radius_n = 5
     matrices_N = 100
     radius_vec = list(np.linspace(0.003, 0.03, radius_n))
-    # x = [0.003, 0.00975, 0.0165, 0.02325, 0.03]
-    # bim = load_object(
-    #     "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA_ratios_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_hist_BIM.pkl")
-    #
-    # res = {"BIM": bim.values()}
-    # from utills import plot_paper_graph
-    #
-    # plot_paper_graph(x, res, load=False, ylabel='$\mathcal{L}_{adv}$', graph_fname='RPCA_sim.pdf')
+    x = [0.003, 0.00975, 0.0165, 0.02325, 0.03]
+    bim = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_BIM.pkl")
+    nifgsm = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_NIFGSM.pkl")
 
-    # res_obj = load_object("/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA_loss_hist_BIM.pkl")
-    #res_obj = [res_obj[radius_vec[0]], res_obj[radius_vec[1]], res_obj[radius_vec[2]], res_obj[radius_vec[3]], res_obj[radius_vec[4]]]
-    # results = {'RPCA-BIM': res_obj}
-    #plot_paper_graph([0], results, graph_fname='RPCA.pdf', y_logscale=True,load=False)
-    for attack in ["BIM", "NIFGSM"]:
-        execute(matrices_N, radius_vec, attack)
+
+    res = {"BIM": list(bim.values()), "NIFGSM": list(nifgsm.values())}
+    from utills import plot_paper_graph
+    plot_paper_graph(x, res, load=False, ylabel='Distortion', graph_fname='RPCA_sim.pdf')
+
+    # res_obj = load_object("")
+    # res_obj = [res_obj[radius_vec[0]], res_obj[radius_vec[1]], res_obj[radius_vec[2]], res_obj[radius_vec[3]], res_obj[radius_vec[4]]]
+    # for attack in [ "NIFGSM", "BIM"]:
+    #     execute(matrices_N, radius_vec, attack)

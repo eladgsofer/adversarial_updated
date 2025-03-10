@@ -19,10 +19,11 @@ np.random.seed(0)
 
 # ADMM configuration
 step_size = 0.00005
+lambda_ = 12.5
+
 max_iter = 10000
 rho = 0.01
 eps_threshold = 1e-3
-lambda_ = 12.5
 
 
 class ADMM(nn.Module, LandscapeWrapper):
