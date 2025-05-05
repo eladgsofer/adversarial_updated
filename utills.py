@@ -538,10 +538,11 @@ def plot_defense_graph(x, res_dict_path, algorithm,attack, **kwargs):
 
 if __name__ == '__main__':
     attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    cw_attack_radius_vec = [1e-05, 0.0001, 0.001, 0.01, 0.1, 1]
 
     # # # Carlini-Wagner Defense - LISTA
     lista_cw_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl"
-    plot_defense_graph(x='adv_epsilon_vec', res_dict_path=lista_cw_path, algorithm='LISTA', xlabel='$c$', attack='CW',
+    plot_defense_graph(x=cw_attack_radius_vec, res_dict_path=lista_cw_path, algorithm='LISTA', xlabel='$c$', attack='CW',
                        load=False, interpolation=False, x_logscale=True)
 
     # # BIM - Defense - LISTA
@@ -575,6 +576,7 @@ if __name__ == '__main__':
 
     vanilla_algo_attacks = {"ADMM-BIM": admm_bim, "ADMM-NIFGSM": admm_nifgsm,
                             "ISTA-BIM": ista_bim, "ISTA-NIFGSM": ista_nifgsm}
+
     plot_paper_graph(attack_radius_vec, vanilla_algo_attacks, "vanilla_attack.pdf", load=False,interpolation=True)
 
     # trajectory graph - from LISTA.py

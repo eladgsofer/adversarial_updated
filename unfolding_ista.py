@@ -120,9 +120,8 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
         else:
             raise Exception("Not implemented attack")
 
-        clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
         for mode in ['robust_model', 'clean_model', 'ista']:
-            # # Initialization
+            # Initialization
             if mode in ['clean_model', 'robust_model']:
                 model = copy.deepcopy(original_model)
                 optimizer = torch.optim.SGD(model.parameters(), lr=5e-05, momentum=0.9, weight_decay=0)
@@ -186,8 +185,9 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
     object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
     save_object(plot_object, object_fname)
-    plot_defense_graph(attack_magnitudes, object_fname, 'LISTA')
 
+    # Plotting isn't from here.. it's from utils.py
+    # plot_defense_graph(attack_magnitudes, object_fname, 'LISTA', attack)
     # plot_mse_vs_epsilon_graphs(attack_magnitudes, final_results_clean, final_results_adv, save_figure=save_figures)
 
 
@@ -375,11 +375,11 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
 def plot_trajectory_paper_graph():
     # TRAJECTORY
     path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
-                                         epsilon=0.005, epochs=40,
+                                         epsilon=0.025, epochs=40,
                                          MBDL=str(True), K=5)
 
     path_adv = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="robust_model",
-                                          epsilon=0.005, epochs=40,
+                                          epsilon=0.025, epochs=40,
                                           MBDL=str(True), K=5)
     clean = load_model_eval_model(path_cl)
     adv = load_model_eval_model(path_adv)
@@ -393,25 +393,22 @@ if __name__ == '__main__':
     epochs = 40
 
     # Plot trajectory graph
-    plot_trajectory_paper_graph()
 
+    # plot_trajectory_paper_graph()
     # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
 
     # Attacks = BIM/CW/FGSM-NITRO
+    for attack in ["NIFGSM", "BIM", "CW"]:
 
-    # for attack in ["NIFGSM", "BIM"]:
-    #
-    #     if attack in ["BIM", "NIFGSM"]:
-    #         attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-    #         # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
-    #     elif attack == "CW":
-    #         attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
-    #     else:
-    #         raise Exception("Not implemented attack")
+        if attack in ["BIM", "NIFGSM"]:
+            attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
+            # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+        elif attack == "CW":
+            attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
+        else:
+            raise Exception("Not implemented attack")
 
-    # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-    # train(lista, train_loader, test_loader, attack=attack,
-    #       attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-    #       save_models=True, save_figures=True)
-
-    # JL lemma - Johnson Lindenshtauch Lemma- norm0 vs norm 1
+        # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
+        train(lista, train_loader, test_loader, attack=attack,
+              attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+              save_models=True, save_figures=True)

@@ -76,8 +76,6 @@ class CW(Attack):
             # Calculate loss
             current_L_inf = abs(adv_x - x).max(axis=1)[0]
             L_inf = current_L_inf.sum()
-            # current_L2 = MSELoss(Flatten(adv_x), Flatten(x)).sum(dim=1)
-            # L2_loss = current_L2.sum()
 
             outputs, _ = self.get_logits(adv_x)
             f_loss = self.f(outputs, y).sum()
@@ -88,12 +86,6 @@ class CW(Attack):
             cost.backward()
             optimizer.step()
 
-        # import matplotlib.pyplot as plt
-        #
-        # plt.plot(x[0].view(-1).detach(), '.-')
-        # plt.plot(adv_x[0].view(-1).detach(), '--')
-        # plt.title(f"MSE {current_L2.sum().item()}")
-        # plt.show()
         return self.inverse_normalize(adv_x.detach(), scale_fac_x), None
 
     def tanh_space(self, x):
