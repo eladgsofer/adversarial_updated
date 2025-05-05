@@ -10,6 +10,9 @@ from data_utils import create_data_set
 import copy
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set_style("whitegrid")  # Use a white background with gridlines
 
 SEED = 0
 torch.manual_seed(SEED)
@@ -39,7 +42,7 @@ classic_ista.N = N
 classic_ista.H = H
 # Generate datasets
 train_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=BATCH_SIZE)
-test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N // 3)
+test_loader = create_data_set(H, n=n, m=m, k=k, N=N, batch_size=N//3)
 
 
 def inference(valid_loader, adv_epsilon_vec, save_figure, epochs, attack):
@@ -108,9 +111,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
     final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_l_inf = {'ista': [], 'clean_model': [], 'robust_model': []}
-    # TODO - train LISTA-clean only once
 
-    # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
         if attack in ["BIM", "NIFGSM"]:
@@ -120,8 +121,9 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
         else:
             raise Exception("Not implemented attack")
 
+        clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
         for mode in ['robust_model', 'clean_model', 'ista']:
-            # Initialization
+            # # Initialization
             if mode in ['clean_model', 'robust_model']:
                 model = copy.deepcopy(original_model)
                 optimizer = torch.optim.SGD(model.parameters(), lr=5e-05, momentum=0.9, weight_decay=0)
@@ -131,14 +133,14 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
                     model.train()
                     if mode == 'robust_model':
                         train_loss, _ = epoch_adversarial(train_loader, model, attack, opt=optimizer,
-                                                          scheduler=scheduler, **attack_kwargs)
+                                                       scheduler=scheduler, **attack_kwargs)
                     else:
                         train_loss = epoch(train_loader, model, opt=optimizer, scheduler=scheduler)
 
                     # Testing phase - Test upon clean & adversarial test examples
                     model.eval()
                     clean_loss = epoch(valid_loader, model)
-                    if attack == "CW":
+                    if attack=="CW":
                         adv_loss, l_inf = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
                     else:
                         adv_loss, _ = epoch_adversarial(valid_loader, model, attack, **attack_kwargs)
@@ -156,7 +158,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
                 for X, y in valid_loader:
                     adv_x, _ = get_attack_func(attack_name=attack)(ista_model, X, y, **attack_kwargs)
-                    if attack == "CW":
+                    if attack=="CW":
                         l_inf += abs(adv_x - X).max(axis=1)[0].sum().item()
 
                     yp_adv, _ = ista_model(adv_x)
@@ -166,7 +168,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
             # Accumulate the last results for MSE vs epsilon graph
             final_results_adv[mode].append(adv_loss)
             final_results_clean[mode].append(clean_loss)
-            if attack == "CW":
+            if attack=="CW":
                 final_results_l_inf[mode].append(l_inf)
 
             if save_models and mode != 'ista':
@@ -185,10 +187,10 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
     object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
     save_object(plot_object, object_fname)
+    plot_defense_graph(attack_magnitudes, object_fname, 'LISTA')
 
-    # Plotting isn't from here.. it's from utils.py
-    # plot_defense_graph(attack_magnitudes, object_fname, 'LISTA', attack)
     # plot_mse_vs_epsilon_graphs(attack_magnitudes, final_results_clean, final_results_adv, save_figure=save_figures)
+
 
 
 class LISTA_Model(nn.Module):
@@ -371,33 +373,33 @@ def plot_loss_surface_trajectories(validation_loader, robust_model, clean_model,
         save_fig('LISTA_trajectories_{0}.pdf'.format(epsilon))
     plt.show()
 
-
-def plot_trajectory_paper_graph():
+def plot_trajectory_paper_graph(epsilon):
     # TRAJECTORY
     path_cl = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="clean_model",
-                                         epsilon=0.025, epochs=40,
-                                         MBDL=str(True), K=5)
+                                      epsilon=epsilon, epochs=40,
+                                      MBDL=str(True), K=5)
 
     path_adv = MODEL_PATH_TEMPLATE.format(model='lista', attack="BIM", mode="robust_model",
-                                          epsilon=0.025, epochs=40,
-                                          MBDL=str(True), K=5)
+                                      epsilon=epsilon, epochs=40,
+                                      MBDL=str(True), K=5)
     clean = load_model_eval_model(path_cl)
     adv = load_model_eval_model(path_adv)
-    plot_loss_surface_trajectories(test_loader, adv, clean, epsilon=0.025, save_figure=True)
+    plot_loss_surface_trajectories(test_loader, adv,clean,epsilon=epsilon,save_figure=True)
+
 
 
 if __name__ == '__main__':
+
     # Train and apply LISTA with T iterations / layers
 
     lista = LISTA_Model.create_lista_model()
     epochs = 40
 
     # Plot trajectory graph
-
-    # plot_trajectory_paper_graph()
-    # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    plot_trajectory_paper_graph(epsilon=0.025)
 
     # Attacks = BIM/CW/FGSM-NITRO
+
     for attack in ["NIFGSM", "BIM", "CW"]:
 
         if attack in ["BIM", "NIFGSM"]:
@@ -409,6 +411,7 @@ if __name__ == '__main__':
             raise Exception("Not implemented attack")
 
         # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-        train(lista, train_loader, test_loader, attack=attack,
-              attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+        train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
               save_models=True, save_figures=True)
+
+

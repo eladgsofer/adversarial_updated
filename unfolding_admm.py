@@ -268,7 +268,8 @@ def plot_loss_surface_trajectories(robust_model, clean_model, epsilon, save_figu
 
 
 class LADMM_Model(nn.Module):
-    def __init__(self, n, m, T=6, rho=0.01, H=H, lambda_=12.5, mu=0.00005):
+    # ***simulations were executed with T=6 instead of T=5***
+    def __init__(self, n, m, T=5, rho=0.01, H=H, lambda_=12.5, mu=0.00005):
         super(LADMM_Model, self).__init__()
         self.n, self.m = n, m
         self.H = H
