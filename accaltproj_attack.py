@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch
 import seaborn as sns
 import time
+
+from utills import load_object
 from utills import save_fig
 from utills import save_object
 
@@ -25,6 +27,61 @@ m = n
 r = 5
 alpha = 0.4
 c = 1
+
+
+def NIFGSM(model, x, L_gt, S_gt, eps=0.1, alpha=0.1,decay=1, steps=3):
+    """
+    The BIM (Basic Iterative Method) adversarial attack is a technique used to generate adversarial examples usually
+     for machine learning models. This function aims to attack ADMM/ISTA optimizers.
+    :param model: ADMM/ISTA object, the target machine learning model to be attacked.
+    :param x: torch vector x - x=Hs+w s.t w~N(0,0.001)
+    :param s_gt: torch vector which represents s^*
+    :param eps:   A small perturbation magnitude that controls the strength of the attack
+    :param alpha: A step size parameter for adjusting the perturbation at each iteration
+    :param steps: The number of iterations to perform the attack.
+    :return: adversarial x signal and the pertubation which was applied.
+    """
+    x = x.clone()#.to(device)
+    momentum = torch.zeros_like(x).detach()
+    # loss = nn.MSELoss()
+
+    original_x = x.data
+    original_x.requires_grad = False
+
+    adv_x = x.clone().detach()
+
+    for step in range(steps):
+
+        #print("#################### BIM Step {0} distance ratio: {1} ####################".format(step, ((adv_x - original_x).norm() / original_x.norm()).item()))
+
+        adv_x.requires_grad = True
+        nes_x = adv_x + decay * alpha * momentum
+        l_hat, s_hat, errs = model(nes_x)
+        model.zero_grad()
+
+        # Calculate loss
+        cost = torch.linalg.norm(original_x - l_hat - s_hat, 'fro')
+        #print("#################### COST: {0} ####################".format(cost.item()/torch.linalg.norm(original_x, 'fro')))
+
+        # cost.backward(retain_graph=True)
+        grad = torch.autograd.grad(cost, adv_x)[0]
+        grad = decay * momentum + grad  # /torch.mean(torch.abs(grad), dim=(1), keepdim=True)
+        momentum = grad
+
+        # Grad is calculated
+        delta = alpha * grad.sign()
+
+        # Stop following gradient changes
+        adv_x = adv_x.clone().detach()
+
+        adv_x = adv_x + delta
+
+        # Clip the change between the adversarial images and the original images to an epsilon range
+        eta = torch.clamp(adv_x - original_x, min=-eps, max=eps)
+
+        adv_x = original_x + eta
+
+    return adv_x, delta  # grad is the gradient (perturbation)
 
 
 def BIM(model, x, L_gt, S_gt, eps=0.1, alpha=0.1, steps=3):
@@ -101,10 +158,9 @@ class AccAltProj(nn.Module, LandscapeWrapper):
            s (torch.Tensor): Initial estimate of the sparse signal.
            model_params (nn.Parameter): Model parameters used for visualization.
        """
-    def __init__(self, beta=None, beta_init=None, max_iter=100, tol=1e-3, gamma=0.7, mu=5):
+    def __init__(self, beta=None, beta_init=None, max_iter=100, tol=1e-2, gamma=0.7, mu=5):
         super(AccAltProj, self).__init__()
 
-        self.mu = torch.tensor(mu)
         self.gamma = torch.tensor(gamma)
         if beta is None:
             self.beta = 1 / (2 * np.power(m * n, 1 / 4))
@@ -243,7 +299,7 @@ class AccAltProj(nn.Module, LandscapeWrapper):
         return copy.deepcopy(other)
 
     @classmethod
-    def create_AccAltProj(cls, beta=None, beta_init=None, max_iter=100, tol=1e-3, gamma=0.7, mu=5):
+    def create_AccAltProj(cls, beta=None, beta_init=None, max_iter=100, tol=1e-2, gamma=0.7, mu=5):
         """
         Creates an instance of the ISTA class with the specified parameters.
         :param H: Sensing matrix.
@@ -274,7 +330,8 @@ def generate_matrices(matrice_amount=100):
         D = L_true + S_true
         matrices.append((torch.tensor(D), torch.tensor(S_true), torch.tensor(L_true)))
     return matrices
-def execute():
+
+def execute(matrices_N, radius_vec, attack):
     """
     Perform a series of operations on generated signals:
     1. Generate 'c' (set to 100) signals of the form x_i = Hs + w, where w follows a Gaussian distribution.
@@ -285,14 +342,10 @@ def execute():
     6. Plot the loss surfaces in various forms (3D, 2D, 1D) and other related graphs.
     """
 
-    matrices_N = 100
-    radius_n = 5
+
 
     matrices = generate_matrices(matrices_N)
     ##########################################################
-
-    radius_vec = np.linspace(0.0001, 0.0005, radius_n)
-    #radius_vec = [0.1, 0.001]
 
     attack_ratios_hist = dict.fromkeys(radius_vec,0)
     adv_loss_hist = dict.fromkeys(radius_vec,0)
@@ -304,15 +357,18 @@ def execute():
 
         AccAltProj_t_model = AccAltProj.create_AccAltProj()
         l_hat, s_hat, err_gt = AccAltProj_t_model.forward(D_original.detach())
-        print("#### RPCA decomposition {0} convergence: iterations: {1} ####".format(mat_idx, len(err_gt)))
+        print("#### RPCA decomposition {0} ####".format(mat_idx))
         # L_gt, S_gt = L_gt.detach(), S_gt.detach()
         gt_loss += (D_original - l_hat - s_hat).norm('fro').item()
         for e_idx, attack_eps in enumerate(radius_vec):
-            print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(attack_eps))
+            #print("Performing BIM to get Adversarial Perturbation - epsilon: {0}".format(attack_eps))
             AccAltProj_adv_model = AccAltProj.create_AccAltProj()
-
-            adv_D, _ = BIM(AccAltProj_adv_model, D_original, S_original, L_original,
-                           alpha=0.01, eps=attack_eps, steps=4)
+            if attack=="BIM":
+                adv_D, _ = BIM(AccAltProj_adv_model, D_original,
+                               S_original, L_original, alpha=0.01, eps=attack_eps, steps=4)
+            else:
+                adv_D, _ = NIFGSM(AccAltProj_adv_model, D_original,
+                                S_original, L_original, alpha=0.01, eps=attack_eps, steps=4)
             adv_D = adv_D.detach()
 
             L_adv, S_adv, _ = AccAltProj_adv_model(adv_D)
@@ -332,24 +388,40 @@ def execute():
     loss_hist = {eps: total_loss/matrices_N for eps, total_loss in adv_loss_hist.items()}
     attack_ratios_hist = {eps: ratio / matrices_N for eps, ratio in attack_ratios_hist.items()}
 
-    save_object(loss_hist, 'RPCA_loss_hist_BIM.pkl')
-    save_object(attack_ratios_hist, 'RPCA_ratios_hist_BIM.pkl')
+    save_object(loss_hist, f'RPCA_loss_hist_{str(radius_vec)}_{attack}.pkl')
+    save_object(attack_ratios_hist, f'RPCA_ratios_{str(radius_vec)}_hist_{attack}.pkl')
 
     plt.figure()
     plt.plot(loss_hist.keys(), loss_hist.values())
     plt.xlabel('epsilon')
     plt.ylabel('Loss = ||D-L_adv-S_adv||/||D||')
-    plt.yscale('log')
-    plt.show()
 
+    plt.show()
     plt.figure()
     plt.plot(attack_ratios_hist.keys(), attack_ratios_hist.values())
     plt.xlabel('epsilon')
     plt.ylabel('ratio')
-    save_fig('ratio_rpca_{0}.pdf')
+    save_fig(f'ratio_rpca_{0}_{attack}.pdf')
     plt.show()
 
 
 
 if __name__ == '__main__':
-    execute()
+    from utills import plot_paper_graph
+    radius_n = 5
+    matrices_N = 100
+    radius_vec = list(np.linspace(0.003, 0.03, radius_n))
+    x = [0.003, 0.00975, 0.0165, 0.02325, 0.03]
+    # was created via the school's Macbook
+    bim = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_BIM.pkl")
+    nifgsm = load_object(r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/RPCA/RPCA_loss_hist_[0.003, 0.00975, 0.0165, 0.02325, 0.03]_NIFGSM.pkl")
+
+
+    res = {"BIM": list(bim.values()), "NIFGSM": list(nifgsm.values())}
+    from utills import plot_paper_graph
+    plot_paper_graph(x, res, load=False, ylabel='Distortion', graph_fname='RPCA_sim.pdf')
+
+    # res_obj = load_object("")
+    # res_obj = [res_obj[radius_vec[0]], res_obj[radius_vec[1]], res_obj[radius_vec[2]], res_obj[radius_vec[3]], res_obj[radius_vec[4]]]
+    # for attack in [ "NIFGSM", "BIM"]:
+    #     execute(matrices_N, radius_vec, attack)
