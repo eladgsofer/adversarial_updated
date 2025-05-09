@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import seaborn as sns
 
-
 import torchattacks
 import numpy as np
 from scipy.interpolate import interp1d
@@ -38,7 +37,7 @@ This module comprises various utility functions for the project such as:
 FIGURES_PATH = r'data/graphs/'
 MATRICES_PATH = r'data/matrices/'
 MODELS_PATH = r'data/models_history/'
-PKL_PATH = r'data/graph_pkl_files'
+PKL_PATH = os.path.join(os.path.curdir, r'data/graph_pkl_files/for_paper/')
 
 MODEL_PATH_TEMPLATE = os.path.join(MODELS_PATH,
                                    '{model}_{attack}_{mode}_{epsilon}_epochs_{epochs}_MBDL_{MBDL}_K={K}.npy')
@@ -398,11 +397,10 @@ def save_fig(fname, transparent=True):
     plt.savefig(os.path.join(FIGURES_PATH, fname), bbox_inches='tight', format='pdf', transparent=transparent)
 
 
-
-
 def save_object(object, fname):
     with open(os.path.join(PKL_PATH, fname), 'wb') as fd:
         pickle.dump(object, fd)
+
 
 def load_object(fname):
     with open(os.path.join(PKL_PATH, fname), 'rb') as fd:
@@ -443,7 +441,7 @@ def calculate_bound_single_model(model, delta):
 
 
 def get_attack_func(attack_name):
-    if type(attack_name)!=str:
+    if type(attack_name) != str:
         return attack_name
     if attack_name == "CW":
         return CarliniWagner
@@ -463,8 +461,8 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
 
     for X, y in loader:
         adv_x, _ = attack_method(model, X, y, **attack_kwargs)
-        if attack=="CW":
-            l_inf_total+= abs(adv_x - X).max(axis=1)[0].sum().item()
+        if attack == "CW":
+            l_inf_total += abs(adv_x - X).max(axis=1)[0].sum().item()
         yp, e_loss = model(adv_x)
         # import matplotlib.pyplot as plt
         # plt.plot(X[0].detach())
@@ -479,7 +477,8 @@ def epoch_adversarial(loader, model, attack, opt=None, scheduler=None, **attack_
         total_loss += loss.data.item()
     if scheduler:
         scheduler.step()
-    return total_loss / len(loader.dataset), l_inf_total/len(loader.dataset)
+    return total_loss / len(loader.dataset), l_inf_total / len(loader.dataset)
+
 
 def plot_paper_graph(x, result_object, graph_fname,
                      xlabel=r'$\epsilon$', ylabel=r'${\| {s}^{\star} - {s}_{\rm adv}^{\star} \|}_2$',
@@ -502,7 +501,6 @@ def plot_paper_graph(x, result_object, graph_fname,
         else:
             plt.plot(x, y, linestyle=styling[idx])
 
-
     plt.legend(titles)
     plt.xlabel(xlabel)
     if x_logscale:
@@ -515,10 +513,9 @@ def plot_paper_graph(x, result_object, graph_fname,
     plt.show()
 
 
-def plot_defense_graph(x, res_dict_path, algorithm,attack, **kwargs):
-
+def plot_defense_graph(x, res_dict_path, algorithm, attack, **kwargs):
     res_object = load_object(res_dict_path)
-    if type(x)==str:
+    if type(x) == str:
         x = res_object[x]
 
     clean_results = {algorithm: res_object['final_results_clean']['clean_model'],
@@ -529,41 +526,46 @@ def plot_defense_graph(x, res_dict_path, algorithm,attack, **kwargs):
                    f'Robust-{algorithm}': res_object['final_results_adv']['robust_model'],
                    str(algorithm[1:]): res_object['final_results_adv'][algorithm[1:].lower()]}
 
-    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}_{attack}.pdf",ylabel='$\|\hat{s}-s^*\|_2$', **kwargs)
+    plot_paper_graph(x, clean_results, f"defense_clean_data_{algorithm}_{attack}.pdf", ylabel='$\|\hat{s}-s^*\|_2$',
+                     **kwargs)
     plot_paper_graph(x, adv_results, f"defense_adv_data_{algorithm}_{attack}.pdf", **kwargs)
 
+
 if __name__ == '__main__':
+    import os
+
     attack_radius_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    cw_attack_radius_vec = [1e-05, 0.0001, 0.001, 0.01, 0.1, 1]
 
     # Carlini-Wagner Defense - LISTA
-    lista_cw_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl"
-
-    # if a string is passed as x argument, the argument is being taken from the object specified at res_dict_path.
-    plot_defense_graph(x='adv_epsilon_vec', res_dict_path=lista_cw_path, algorithm='LISTA', xlabel='$c$', attack='CW',
+    lista_cw_path = "LISTA_defense_eps_[1e-05, 0.0001, 0.001, 0.01, 0.1, 1]_CW.pkl"
+    plot_defense_graph(x=cw_attack_radius_vec, res_dict_path=lista_cw_path, algorithm='LISTA', xlabel='$c$',
+                       attack='CW',
                        load=False, interpolation=False, x_logscale=True)
 
     # BIM - Defense - LISTA
-    lista_bim_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
+    lista_bim_path = "defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
     plot_defense_graph(attack_radius_vec, lista_bim_path, attack="BIM", algorithm='LISTA',
                        load=False, interpolation=True)
     # NIFGSM - Defense - LISTA
-    lista_nifgsm_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
+    lista_nifgsm_path = "defenses/LISTA_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
     plot_defense_graph(attack_radius_vec, lista_nifgsm_path, attack="NIFGSM", algorithm='LISTA',
                        load=False, interpolation=True)
 
     # LISTA Bound-Graph
+    bound_path = "bound_graph_n=1200.pkl"
     plot_paper_graph(attack_radius_vec,
-                     "/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/for paper/bound_graph_n=1200.pkl",
-                     'LISTA_bound_graph.pdf', ylabel=r'$C(\theta)}$',interpolation=True)
+                     bound_path,
+                     'LISTA_bound_graph.pdf', ylabel=r'$C(\theta)}$')
 
     # BIM Defense - LADMM
-    ladmm_bim_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
-    plot_defense_graph(attack_radius_vec, ladmm_bim_path, attack="BIM",
-                       algorithm='LADMM', load=False, interpolation=True)
+    ladmm_bim_path = "defenses/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_BIM.pkl"
+    plot_defense_graph(attack_radius_vec, ladmm_bim_path, attack="BIM", algorithm='LADMM',
+                       load=False, interpolation=True)
 
-    ladmm_nifgsm_path = r"/Users/eladsofer/venv/icml/adversarial_updated/data/graph_pkl_files/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
-    plot_defense_graph(attack_radius_vec, ladmm_nifgsm_path, attack="NIFGSM",
-                       algorithm='LADMM', load=False, interpolation=True)
+    ladmm_nifgsm_path = "defenses/LADMM_defense_eps_[0.005, 0.025, 0.045, 0.065, 0.085]_NIFGSM.pkl"
+    plot_defense_graph(attack_radius_vec, ladmm_nifgsm_path, attack="NIFGSM", algorithm='LADMM',
+                       load=False, interpolation=True)
 
     # Attack graph
     admm_bim = load_object(ladmm_bim_path)["final_results_adv"]["admm"]
@@ -573,39 +575,6 @@ if __name__ == '__main__':
 
     vanilla_algo_attacks = {"ADMM-BIM": admm_bim, "ADMM-NIFGSM": admm_nifgsm,
                             "ISTA-BIM": ista_bim, "ISTA-NIFGSM": ista_nifgsm}
-    plot_paper_graph(attack_radius_vec, vanilla_algo_attacks, "vanilla_attack.pdf", load=False,interpolation=True)
+    plot_paper_graph(attack_radius_vec, vanilla_algo_attacks, "vanilla_attack.pdf", load=False, interpolation=True)
 
-    # trajectory graph - run __main__ at unfolding_ista.py
-
-
-
-# if __name__ == '__main__':
-#     MLSP
-#     radius_vec = np.linspace(eps_min, eps_max, r_step)
-#     ISTA_min_distances = np.load('data/stack/version1/matrices/ISTA_total_norm.npy')
-#     ADMM_min_distances = np.load('data/stack/version1/matrices/ADMM_total_norm.npy')
-#     plt.figure()
-#     # plt.style.use('plot_style.txt')
-#
-#     plt.plot(radius_vec, ADMM_min_distances.mean(axis=0), '.-')
-#     plt.plot(radius_vec, ISTA_min_distances.mean(axis=0))
-#     plt.xlabel(r'$\epsilon$')
-#     plt.ylabel(r'${\|\| {s}^{\star} - {s}_{\rm adv}^{\star} \|\|}_2$')
-#     plt.legend(['ADMM', 'ISTA'])
-#     save_fig('norm2_combined.pdf')
-#     plt.show()
-#
-#     x, s = generate_signal()
-#     plt.figure(figsize=(8, 8))
-#     plt.subplot(2, 1, 1)
-#     plt.plot(x, label='observation')
-#     plt.xlabel('Index', fontsize=10)
-#     plt.ylabel('Value', fontsize=10)
-#     plt.legend()
-#     plt.subplot(2, 1, 2)
-#
-#     plt.plot(s[0], label='sparse signal', color='k')
-#     plt.xlabel('Index', fontsize=10)
-#     plt.ylabel('Value', fontsize=10)
-#     plt.legend()
-#     plt.show()
+    # trajectory graph - run via __main__ at unfolding_ista.py
