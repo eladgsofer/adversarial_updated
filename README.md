@@ -32,5 +32,5 @@ To use this repository:
 2. **Re-run Experiments:**
    To repeat a specific experiment, run its corresponding module. For example:
 
-   * To re-run the **LISTA** experiment, execute `unfolding_ista.py`.
+   * To re-run the **LISTA** experiment and reproducing its related graphs, execute `unfolding_ista.py`.
 3. To run the Yale experiment run the notebook under yale_experiment folder while inserting the data_images in the appropriate path.
