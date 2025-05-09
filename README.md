@@ -14,7 +14,15 @@ by Elad Sofer, Tomer Shaked, Caroline Chaux, and Nir Shlezinger.
   CNRS, IPAL, Singapore
   Contact: [caroline.chaux@cnrs.fr](mailto:caroline.chaux@cnrs.fr)
 
-## Getting Started
+## Installation
+To get started, please follow the instructions below to install the necessary requirements:
+
+1. Ensure that Python version 3.8 is installed on your system.
+2. Download or clone this repository to your local machine.
+3. Navigate to the project directory using **'cd \<folder>'** command.
+4. Run the command **'pip install -r requirements.txt'** to install all the necessary packages.
+   
+## Usage
 
 To use this repository:
 
