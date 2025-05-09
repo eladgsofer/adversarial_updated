@@ -1,11 +1,11 @@
 import torch
-from utills import plot_defense_graph
+from utils import plot_defense_graph
 import torch.nn.functional as F
 import torchattacks
 import torch.nn as nn
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func, save_object, load_object
+from utils import epoch, epoch_adversarial, save_fig, MODEL_PATH_TEMPLATE, get_attack_func, save_object, load_object
 from data_utils import create_data_set
 import copy
 

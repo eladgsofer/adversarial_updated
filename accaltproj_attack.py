@@ -10,9 +10,9 @@ import torch
 import seaborn as sns
 import time
 
-from utills import load_object
-from utills import save_fig
-from utills import save_object
+from utils import load_object
+from utils import save_fig
+from utils import save_object
 
 from visualize_model import LandscapeWrapper
 
@@ -407,7 +407,7 @@ def execute(matrices_N, radius_vec, attack):
 
 
 if __name__ == '__main__':
-    from utills import plot_paper_graph
+    from utils import plot_paper_graph
     radius_n = 5
     matrices_N = 100
     radius_vec = list(np.linspace(0.003, 0.03, radius_n))
@@ -418,7 +418,7 @@ if __name__ == '__main__':
 
 
     res = {"BIM": list(bim.values()), "NIFGSM": list(nifgsm.values())}
-    from utills import plot_paper_graph
+    from utils import plot_paper_graph
     plot_paper_graph(x, res, load=False, ylabel='Distortion', graph_fname='RPCA_sim.pdf')
 
     # res_obj = load_object("")

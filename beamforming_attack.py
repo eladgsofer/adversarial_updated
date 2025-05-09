@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 # official beam_forming module in - https://github.com/ortalagiv/learn-to-rapidly-optimize-hybrid-precoding
 # for more info about beam-forming - https://arxiv.org/abs/2301.00369
 from beam_forming import N, L, B, num_of_iter_pga, ProjGA, H_test
-from utills import device
+from utils import device
 import os
-from utills import save_object, load_object
+from utils import save_object, load_object
 
 def beamforming_NIFGSM(model, h, eps=0.1, alpha=1,decay=1, steps=30,randomize=True):
     """

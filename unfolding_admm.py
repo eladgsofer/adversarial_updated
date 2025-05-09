@@ -3,10 +3,10 @@ import torch.utils.data as Data
 import torch.nn.functional as F
 import torch.nn as nn
 from scipy.linalg import eigvalsh
-from utills import save_fig
+from utils import save_fig
 import numpy as np
 import random
-from utills import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE, save_object, plot_defense_graph
+from utils import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE, save_object, plot_defense_graph
 from data_utils import create_data_set
 
 import copy

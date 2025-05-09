@@ -7,11 +7,11 @@ import torch.nn as nn
 import torch
 import seaborn as sns
 
-from utills import generate_signal, plot_conv_rec_graph, BIM, plot_3d_surface, \
+from utils import generate_signal, plot_conv_rec_graph, BIM, plot_3d_surface, \
     plot_2d_surface, plot_1d_surface, plot_norm_graph, plot_observations
-from utills import sig_amount, r_step, eps_min, eps_max, loss3d_res_steps
+from utils import sig_amount, r_step, eps_min, eps_max, loss3d_res_steps
 from visualize_model import LandscapeWrapper
-from utills import m, H
+from utils import m, H
 
 sns.set()
 np.random.seed(0)
