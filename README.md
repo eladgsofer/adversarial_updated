@@ -5,7 +5,7 @@ Welcome to the official repository for the research paper
 by Elad Sofer, Tomer Shaked, Caroline Chaux, and Nir Shlezinger.
 
 Parts of this work were presented at the IEEE International Workshop on Machine Learning for Signal Processing (MLSP) 2023 as the paper: “On the interpretable adversarial sensitivity
-of iterative optimizers,” by Elad Sofer and Nir Shlezinger
+of iterative optimizers,” by Elad Sofer and Nir Shlezinger.
 
 ## Authors
 
