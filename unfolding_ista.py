@@ -403,7 +403,7 @@ if __name__ == '__main__':
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    for attack in ["CW"]:
+    for attack in ["CW", "BIM", "NIFGSM", "PGD"]:
         if attack in ["BIM", "NIFGSM"]:
             attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
         elif attack=="PGD":
@@ -414,14 +414,14 @@ if __name__ == '__main__':
             raise Exception("Not implemented attack")
         # bound_fname = plot_bound_graph(attack_magnitudes, attack
         #
-        bound_fname = "a"                                #=attack)
-        plot_paper_graph(attack_magnitudes,
-                         bound_fname,
-                         f'bound_LISTA_{attack}.pdf',
-                         x_logscale=True, ylabel=r'$C(\theta)}$',xlabel='$c$',
-                         load=True)
+        # bound_fname = "a"                                #=attack)
+        # plot_paper_graph(attack_magnitudes,
+        #                  bound_fname,
+        #                  f'bound_LISTA_{attack}.pdf',
+        #                  x_logscale=True, ylabel=r'$C(\theta)}$',xlabel='$c$',
+        #                  load=True)
         # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-        # train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-        #       save_models=True, save_figures=True)
+        train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+              save_models=True, save_figures=True)
 
 
