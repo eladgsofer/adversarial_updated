@@ -50,6 +50,7 @@ def inference(valid_loader, adv_epsilon_vec, save_figure, epochs, attack):
     validation - for plot recreation
     """
 
+
     final_results_adv = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
     for eps in adv_epsilon_vec:
@@ -112,9 +113,10 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
     final_results_clean = {'ista': [], 'clean_model': [], 'robust_model': []}
     final_results_l_inf = {'ista': [], 'clean_model': [], 'robust_model': []}
 
+
     for eps in attack_magnitudes:
         # Accumulate history for MSE vs epoch graph
-        if attack in ["BIM", "NIFGSM"]:
+        if attack in ["BIM", "NIFGSM", "PGD"]:
             attack_kwargs = dict(eps=eps)
         elif attack == "CW":
             attack_kwargs = dict(c=eps)
@@ -147,7 +149,6 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
                     print(*("{:.6f}".format(i) for i in (train_loss, clean_loss, adv_loss)), sep="\t")
             else:
-
                 ista_model = classic_ista.ISTA.create_ISTA(H=H, max_iter=1000)
                 adv_loss, clean_loss = 0., 0.
                 l_inf = 0.
@@ -187,7 +188,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack, attack
 
     object_fname = f'LISTA_defense_eps_{str(attack_magnitudes)}_{attack}.pkl'
     save_object(plot_object, object_fname)
-    plot_defense_graph(attack_magnitudes, object_fname, 'LISTA')
+    plot_defense_graph(attack_magnitudes, object_fname, 'LISTA',attack=attack,load=False)
 
     # plot_mse_vs_epsilon_graphs(attack_magnitudes, final_results_clean, final_results_adv, save_figure=save_figures)
 
@@ -253,7 +254,7 @@ def load_model_eval_model(path):
     return loaded_model
 
 
-def plot_bound_graph(adv_epsilon_vec):
+def plot_bound_graph(adv_epsilon_vec, attack="BIM"):
     # Calculate ISTA bound
     # avg_number_ista_iterations = 300
     # ista_obj = classic_ista.ISTA.create_ISTA()
@@ -271,23 +272,24 @@ def plot_bound_graph(adv_epsilon_vec):
 
     cl_sing_max, adv_sing_max, classic_ista_sing_max = [], [], []
     for e in adv_epsilon_vec:
-        cl_max_singular_value, adv_max_singular_value = calculate_bound(e)
+        cl_max_singular_value, adv_max_singular_value = calculate_bound(e, attack=attack)
         cl_sing_max.append(cl_max_singular_value.item())
         adv_sing_max.append(adv_max_singular_value.item())
 
     norm_factor = max(cl_sing_max)
     cl_sing_max = np.array(cl_sing_max) / norm_factor
     adv_sing_max = np.array(adv_sing_max) / norm_factor
+    fname = F'LISTA_{attack}_bound_graph_n=1200.pkl'
+    save_object({'LISTA': cl_sing_max, 'Robust-LISTA': adv_sing_max},fname )
+    return fname
 
-    save_object({'LISTA': cl_sing_max, 'Robust-LISTA': adv_sing_max}, 'bound_graph_n=1200.pkl')
 
-
-def calculate_bound(eps):
+def calculate_bound(eps, attack):
     # Calculate LISTA bounds
-    path_clean = MODEL_PATH_TEMPLATE.format(model='lista', mode='clean_model', epsilon=eps, epochs=epochs, attack='BIM',
+    path_clean = MODEL_PATH_TEMPLATE.format(model='lista', mode='clean_model', epsilon=eps, epochs=epochs, attack=attack,
                                             MBDL=str(True), K=LISTA_Model.T_LISTA)
 
-    path_adv = MODEL_PATH_TEMPLATE.format(model='lista', mode='robust_model', epsilon=eps, epochs=epochs, attack='BIM',
+    path_adv = MODEL_PATH_TEMPLATE.format(model='lista', mode='robust_model', epsilon=eps, epochs=epochs, attack=attack,
                                           MBDL=str(True), K=LISTA_Model.T_LISTA)
 
     lista_clean = load_model_eval_model(path_clean)
@@ -389,6 +391,7 @@ def plot_trajectory_paper_graph(epsilon):
 
 
 if __name__ == '__main__':
+    from utils import plot_paper_graph
 
     # Train and apply LISTA with T iterations / layers
 
@@ -396,22 +399,29 @@ if __name__ == '__main__':
     epochs = 40
 
     # Plot trajectory graph
-    plot_trajectory_paper_graph(epsilon=0.025)
+    # plot_trajectory_paper_graph(epsilon=0.025)
 
     # Attacks = BIM/CW/FGSM-NITRO
 
-    for attack in ["NIFGSM", "BIM", "CW"]:
-
+    for attack in ["CW"]:
         if attack in ["BIM", "NIFGSM"]:
             attack_magnitudes = [0.005, 0.025, 0.045, 0.065, 0.085]
-            # attack_magnitudes = [0.025, 0.045, 0.065, 0.085]
+        elif attack=="PGD":
+            attack_magnitudes = [0.05, 0.25, 0.45, 0.65, 0.85]
         elif attack == "CW":
             attack_magnitudes = [0.00001, 0.0001, 0.001, 0.01, 0.1, 1]
         else:
             raise Exception("Not implemented attack")
-
+        # bound_fname = plot_bound_graph(attack_magnitudes, attack
+        #
+        bound_fname = "a"                                #=attack)
+        plot_paper_graph(attack_magnitudes,
+                         bound_fname,
+                         f'bound_LISTA_{attack}.pdf',
+                         x_logscale=True, ylabel=r'$C(\theta)}$',xlabel='$c$',
+                         load=True)
         # inference(valid_loader=test_loader, adv_epsilon_vec=attack_magnitudes, attack=attack, save_figure=True, epochs=epochs)
-        train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
-              save_models=True, save_figures=True)
+        # train(lista, train_loader, test_loader, attack=attack, attack_magnitudes=attack_magnitudes, num_epochs=epochs,
+        #       save_models=True, save_figures=True)
 
 

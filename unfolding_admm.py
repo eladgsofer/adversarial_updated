@@ -6,7 +6,7 @@ from scipy.linalg import eigvalsh
 from utils import save_fig
 import numpy as np
 import random
-from utils import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE, save_object, plot_defense_graph
+from utils import epoch, epoch_adversarial, MODEL_PATH_TEMPLATE, save_object, plot_defense_graph, BIM, PGD
 from data_utils import create_data_set
 
 import copy
@@ -22,7 +22,7 @@ torch.set_default_dtype(torch.float64)
 BATCH_SIZE = 50
 T_ADMM = 5
 
-N = 20  # number of samples
+N = 1200  # number of samples
 
 # n = 150  # dim(x)
 # m = 200  # dim(s)
@@ -61,20 +61,20 @@ def inference(valid_loader, save_figures=False):
 
     # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     # adv_epsilon_vec = [0.006, 0.025, 0.038, 0.055, 0.069, attack_max_radius]
-    adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
-
+    # adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    adv_epsilon_vec = [0.1, 0.5, 0.9, 1.3, 1.7]
     for eps in adv_epsilon_vec:
         # Accumulate history for MSE vs epoch graph
         clean_model_adv, clean_model_clean, robust_model_adv, robust_model_clean = [], [], [], []
         for mode in ['clean_model', 'admm', 'robust_model']:
             # Initialization
             if mode in ['clean_model', 'robust_model']:
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM',N=N,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='PGD',N=N,
                                                   mode=mode, epsilon=eps, epochs=def_num_epochs,
                                                   MBDL=str(True), K=T_ADMM)
                 model = load_model_eval_model(path)
                 clean_loss = epoch(valid_loader, model)
-                adv_loss = epoch_adversarial(valid_loader, model, classic_admm.BIM, eps=eps)
+                adv_loss, _ = epoch_adversarial(valid_loader, model, PGD, eps=eps)
 
             else:
                 admm_model = classic_admm.ADMM.create_ADMM(H=H, max_iter=1000)
@@ -85,7 +85,7 @@ def inference(valid_loader, save_figures=False):
                 clean_loss /= len(valid_loader.dataset)
 
                 for X, y in valid_loader:
-                    adv_x, _ = classic_admm.BIM(admm_model, X, y, eps=eps)
+                    adv_x, _ = PGD(admm_model, X, y, eps=eps)
                     yp_adv, _ = admm_model(adv_x)
                     adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
 
@@ -106,7 +106,7 @@ def inference(valid_loader, save_figures=False):
 
     plot_object = {'adv_epsilon_vec': adv_epsilon_vec, 'final_results_clean': final_results_clean,
                    'final_results_adv': final_results_adv}
-    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"BIM".pkl'
+    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"PGD".pkl'
     save_object(plot_object, object_fname)
     plot_defense_graph(adv_epsilon_vec, object_fname, "LADMM")
 
@@ -123,7 +123,9 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
 
     # adv_epsilon_vec = list(np.linspace(0.006, attack_max_radius, 4))
     # adv_epsilon_vec = [0.006, 0.025, 0.038, 0.055, 0.069, attack_max_radius]
-    adv_epsilon_vec = [0.005, 0.025, 0.045, 0.065, 0.085]
+    adv_epsilon_vec = [0.05, 0.25, 0.45, 0.65, 0.85]
+
+    adv_epsilon_vec = [0.1, 0.5, 0.9, 1.3, 1.7]
 
     for eps in adv_epsilon_vec:
         # Accumulate history for MSE vs epoch graph
@@ -138,7 +140,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 for t in range(num_epochs):
                     model.train()
                     if mode == 'robust_model':
-                        train_loss = epoch_adversarial(train_loader, model, classic_admm.BIM, opt=optimizer,
+                        train_loss, _ = epoch_adversarial(train_loader, model, PGD, opt=optimizer,
                                                        scheduler=scheduler, eps=eps)
                     else:
                         train_loss = epoch(train_loader, model, opt=optimizer, scheduler=scheduler)
@@ -146,7 +148,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                     # Testing phase - Test upon clean & adversarial test examples
                     model.eval()
                     clean_loss = epoch(valid_loader, model)
-                    adv_loss = epoch_adversarial(valid_loader, model, classic_admm.BIM, eps=eps)
+                    adv_loss, _ = epoch_adversarial(valid_loader, model, PGD, eps=eps)
                     if mode == 'robust_model':
                         robust_model_adv.append(adv_loss)
                         robust_model_clean.append(clean_loss)
@@ -165,7 +167,7 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
                 clean_loss /= len(valid_loader.dataset)
 
                 for X, y in valid_loader:
-                    adv_x, _ = classic_admm.BIM(admm_model, X, y, eps=eps)
+                    adv_x, _ = PGD(admm_model, X, y, eps=eps)
                     yp_adv, _ = admm_model(adv_x)
                     adv_loss += F.mse_loss(yp_adv.T, y, reduction="sum").item()
 
@@ -174,13 +176,13 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
             final_results_adv[mode].append(adv_loss)
             final_results_clean[mode].append(clean_loss)
 
-            if mode == 'robust_model':
-                robust_model = copy.deepcopy(model)
-            elif mode == 'clean_model':
-                clean_model = copy.deepcopy(model)
+            # if mode == 'robust_model':
+            #     robust_model = copy.deepcopy(model)
+            # elif mode == 'clean_model':
+            #     clean_model = copy.deepcopy(model)
 
             if save_models and mode != 'admm':
-                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='BIM', mode=mode,N=N,
+                path = MODEL_PATH_TEMPLATE.format(model='ladmm', attack='PGD', mode=mode,N=N,
                                                   epsilon=eps, epochs=num_epochs, MBDL=str(True), K=model.T)
 
                 torch.save(model.state_dict(), path)
@@ -192,9 +194,9 @@ def train(original_model, train_loader, valid_loader, num_epochs, attack_max_rad
 
     plot_object = {'adv_epsilon_vec': adv_epsilon_vec, 'final_results_clean': final_results_clean,
                    'final_results_adv': final_results_adv}
-    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"BIM".pkl'
+    object_fname = f'LADMM_defense_eps_{str(adv_epsilon_vec)}_"PGD".pkl'
     save_object(plot_object, object_fname)
-    plot_defense_graph(adv_epsilon_vec, object_fname, "LADMM")
+    plot_defense_graph(adv_epsilon_vec, object_fname, "LADMM",attack='PGD',load=False)
 
 
 def load_model_eval_model(path):
@@ -344,9 +346,9 @@ class LADMM_Model(nn.Module):
 if __name__ == '__main__':
     # Train and apply LISTA with T iterations / layers
     ladmm = LADMM_Model.create_ladmm_model(H, T_ADMM)
-    inference(test_loader, save_figures=False)
-    # train(ladmm, train_loader, test_loader, num_epochs=def_num_epochs,
-    #       attack_max_radius=def_attack_radius, save_models=True)
+    # inference(test_loader, save_figures=False)
+    train(ladmm, train_loader, test_loader, num_epochs=def_num_epochs,
+          attack_max_radius=def_attack_radius, save_models=True)
 
     # 1. MLSP
     # 2. RPCA attack

@@ -145,6 +145,57 @@ def NIFGSM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, decay=1, randomize=True
     return adv_x, delta  # grad is the gradient (perturbation)
 
 
+def PGD(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, random_start=True, targeted=False):
+    """
+    PGD-L2 attack for 1D inputs (shape: [N, D]).
+    """
+    x = x.clone().detach()
+    s_gt = s_gt.clone().detach()
+    adv = x.clone().detach()
+
+    loss_fn = nn.MSELoss()
+
+    batch_size = x.size(0)
+    dim = x.size(1)   # input dimension D
+
+    # Random start
+    if random_start:
+        noise = torch.randn_like(adv)
+        noise_norm = torch.norm(noise, p=2, dim=1, keepdim=True) + 1e-10
+        radii = torch.rand(batch_size, 1, device=device) * eps
+        noise = noise / noise_norm * radii
+        adv = (x + noise).detach()
+
+    # PGD loop
+    for _ in range(steps):
+        adv.requires_grad_(True)
+        s_hat, _ = model(adv)
+
+        # Calculate loss
+        if s_gt.shape != s_hat.shape:
+            cost = loss_fn(s_gt, s_hat.T)
+        else:
+            cost = loss_fn(s_gt, s_hat)
+
+        # Gradient
+        grad = torch.autograd.grad(cost, adv, retain_graph=False, create_graph=False)[0]
+
+        # Normalize gradient (per-example L2)
+        grad_norm = torch.norm(grad, p=2, dim=1, keepdim=True) + 1e-10
+        grad = grad / grad_norm
+
+        # Step
+        adv = adv.detach() + alpha * grad
+
+        # Project back into L2 ball
+        delta = adv - x
+        delta_norm = torch.norm(delta, p=2, dim=1, keepdim=True)
+        factor = torch.min(eps / (delta_norm + 1e-10), torch.ones_like(delta_norm))
+        delta = delta * factor
+        adv = (x + delta).detach()
+
+    return adv, delta
+
 def BIM(model, x, s_gt, eps=0.1, alpha=0.01, steps=5, randomize=True, **kwargs):
     """
     The BIM (Basic Iterative Method) adversarial attack is a technique used to generate adversarial examples usually
@@ -449,6 +500,8 @@ def get_attack_func(attack_name):
         return BIM
     elif attack_name == "NIFGSM":
         return NIFGSM
+    elif attack_name == "PGD":
+        return PGD
     else:
         raise Exception("not valid attack")
 
