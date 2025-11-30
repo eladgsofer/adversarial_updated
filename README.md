@@ -1,8 +1,8 @@
 # Adversarial Sensitivity
 
 Welcome to the official repository for the research paper
-**"Unveiling and Mitigating Adversarial Vulnerabilities in Iterative Optimizers"**
-by Elad Sofer, Tomer Shaked, Caroline Chaux, and Nir Shlezinger.
+***“Unveiling and Mitigating Adversarial Vulnerabilities in Iterative Optimizers”***,
+authored by Elad Sofer, Tomer Shaked, Caroline Chaux, and Nir Shlezinger, and published in the *IEEE Transactions on Signal Processing 2025*.
 
 Parts of this work were presented at the IEEE International Workshop on Machine Learning for Signal Processing (MLSP) 2023 as the paper: “On the interpretable adversarial sensitivity
 of iterative optimizers,” by Elad Sofer and Nir Shlezinger.
